@@ -8,10 +8,7 @@ GD Organizer is a lightweight launcher and mod management utility for Geometry D
 ### 1. Instance and Directory Management
 The application allows users to register multiple Geometry Dash directories. Each registered instance is independently audited to verify the presence and integrity of the Geode loader.
 
-### 2. Advanced Geode Detection Logic
-A robust detection algorithm is employed that looks beyond directory existence. The launcher validates the presence of essential binary components, including `Geode.dll`, `geode-loader.dll`, and `XInput9_1_0.dll`. This ensures accurate status reporting even in cases of partial or corrupted uninstallation.
-
-### 3. Localization Architecture
+### 2. Localization Architecture
 The user interface is built upon a scalable localization framework. Regional JSON files located in the `locales/` directory (e.g., `en-EN.json`, `de-DE.json`) facilitate instantaneous language switching without necessitating a full application reload.
 
 ---

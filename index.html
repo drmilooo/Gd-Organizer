@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GD Organizer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-app-credit="drmilooo">
+  <div class="titlebar">
+    <div class="drag-region"></div>
+    <div class="app-info">
+      <img src="logo.png" class="app-icon" alt="Logo" style="width: 16px; height: 16px; object-fit: contain;">
+      <span>GD Organizer</span>
+    </div>
+  </div>
+  
+  <div class="app-container">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo" id="sidebar-logo">GD ORGANIZER</div>
+        <button class="add-btn" id="add-folder-btn" title="Add Geometry Dash Instance">+</button>
+      </div>
+      
+      <div class="folder-list" id="folder-list">
+        <!-- Folders will be injected here -->
+      </div>
+
+      <!-- Settings Sidebar Nav (Hidden by default) -->
+      <div class="settings-nav" id="settings-nav" style="display: none;">
+        <div class="settings-nav-item active" data-tab="general" id="nav-general">General</div>
+        <div class="settings-nav-item" data-tab="appearance" id="nav-appearance">Appearance</div>
+        <div class="settings-nav-item" data-tab="about" id="nav-about">About</div>
+        
+        <button class="back-to-home-btn" id="back-home-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5m0 0l7 7m-7-7l7-7" />
+          </svg>
+          <span id="back-home-text">Back to Instances</span>
+        </button>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="settings-entry" id="settings-btn">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <span id="settings-text">Settings</span>
+        </div>
+        <div class="status-box">
+          <div class="status-dot"></div>
+          <span id="status-text">Ready</span>
+        </div>
+      </div>
+    </div>
+
+    <main class="main-content">
+      <!-- Settings View -->
+      <div id="settings-view" class="screen">
+        <div class="content-view">
+          <div class="game-details">
+            <h1 id="settings-view-title" style="font-size: 32px; margin-bottom: 8px;">Settings</h1>
+            <p id="settings-view-desc" style="color: var(--text-dim); font-size: 14px;">Customize your GD Organizer experience</p>
+          </div>
+          
+          <div class="settings-dashboard">
+            <div class="settings-tab-content active" id="tab-general">
+              <div class="setting-item">
+                <label id="label-lang">Language (Beta)</label>
+                <select class="settings-select">
+                  <option value="en-EN">English</option>
+                  <option value="de-DE">German (Deutsch)</option>
+                  <option value="pl-PL">Polish (Polski)</option>
+                  <option value="it-IT">Italian (Italiano)</option>
+                  <option value="es-ES">Spanish (Español)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="settings-tab-content" id="tab-appearance" style="display: none;">
+              <div class="setting-item">
+                <label id="label-theme">Theme</label>
+                <div class="theme-choices">
+                  <div class="theme-card active">Dark</div>
+                  <div class="theme-card">Light</div>
+                  <div class="theme-card">System</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-tab-content" id="tab-about" style="display: none;">
+              <div class="about-section">
+                <h3 id="about-title">GD Organizer</h3>
+                <p id="about-version">0.1.0 Beta (unstable)</p>
+                <div class="about-description" style="margin-top: 12px; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+                  <p>GD Organizer is a lightweight launcher and mod manager for Geometry Dash. It helps you easily install, manage, and update mods with a simple and modern interface, providing powerful mod management tools and a clean user experience.</p>
+                </div>
+                <div class="contributors" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.05);">
+                  <span style="font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase;">Contributors</span>
+                  <div style="margin-top: 8px; display: flex; align-items: center; gap: 10px;">
+                    <img src="logo.png" style="width: 32px; height: 32px; border-radius: 8px; object-fit: contain; background: rgba(255,255,255,0.03);">
+                    <div>
+                      <div style="font-size: 13px; font-weight: 600;">drmilooo</div>
+                      <a href="https://github.com/drmilooo" target="_blank" style="font-size: 11px; color: var(--accent); text-decoration: none;">github.com/drmilooo</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="no-selection" class="screen active">
+        <div class="hero-content">
+          <div class="hero-icon">
+            <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+          </div>
+          <h2 id="no-selection-title">Select an Instance</h2>
+          <p id="no-selection-desc">Choose a folder from the sidebar to manage and play.</p>
+        </div>
+      </div>
+
+      <div id="game-selection" class="screen">
+        <div class="content-view">
+          <div class="game-details">
+            <div class="title-section">
+              <h1 id="current-game-title">Geometry Dash</h1>
+              <div id="geode-icon" class="status-pill geode" style="display: none;">
+                <img src="geode-logo.png" alt="Geode" />
+                <span>Geode</span>
+              </div>
+              <div class="status-pill version">
+                <span id="current-game-version">Checking...</span>
+              </div>
+            </div>
+            
+            <p id="current-game-path" class="path-display"></p>
+          </div>
+          
+          <div class="action-area">
+            <div class="button-group">
+              <button id="play-btn" class="primary-btn">
+                <span id="play-btn-text">PLAY</span>
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </button>
+              <button id="delete-instance-btn" class="icon-btn delete" title="Delete Instance">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div id="mods-section" class="mods-container" style="display: none;">
+            <div class="section-header" style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+              <div>
+                <h3 id="mods-header-title" style="margin: 0; font-size: 18px; color: white;">Installed Mods</h3>
+                <p id="mod-stats" style="margin: 4px 0 0 0; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px;">
+                  <span id="mod-count" style="color: var(--accent); font-weight: bold;">0</span> <span id="mods-found-text">MODS FOUND</span>
+                </p>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <div class="search-box">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                  <input type="text" id="mod-search" placeholder="Search mods..." autocomplete="off">
+                </div>
+                <button id="install-mod-btn" class="install-mod-btn">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                    <path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div id="mods-list" class="mods-grid">
+              <!-- Mods will be listed here -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Dependency Warning Modal -->
+  <div id="dependency-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="dep-modal-title">Dependency Warning</h3>
+        <p id="dep-modal-desc">The following mods depend on this and might stop working:</p>
+      </div>
+      <div id="dependent-mods-list" class="mods-grid" style="margin-bottom: 24px; max-height: 150px;">
+        <!-- List of dependent mods -->
+      </div>
+      <div class="modal-footer" style="flex-direction: column; gap: 10px;">
+        <button id="disable-all-btn" class="btn-primary" style="width: 100%;">Close All Dependent Mods</button>
+        <button id="disable-only-btn" class="btn-secondary" style="width: 100%;">Close Only Selected Mod</button>
+        <button id="cancel-dep-btn" class="btn-secondary" style="width: 100%; border: none;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Install Preview Modal -->
+  <div id="install-preview-modal" class="modal-overlay">
+    <div class="modal" style="width: 450px;">
+      <div class="modal-header">
+        <div class="badge" style="margin-bottom: 12px; background: rgba(79, 70, 229, 0.2); color: var(--accent); border: 1px solid var(--accent); display: inline-block;">MOD PREVIEW</div>
+        <h2 id="preview-name" style="margin-bottom: 4px;">Mod Name</h2>
+        <p id="preview-meta" style="font-size: 12px; color: var(--text-dim); margin-bottom: 20px;">v1.0.0 by Developer</p>
+      </div>
+      <div style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 24px;">
+        <p id="preview-desc" style="font-size: 14px; line-height: 1.6; color: var(--text-secondary); margin: 0; min-height: 60px;">Description goes here...</p>
+      </div>
+      <div class="modal-footer" style="justify-content: space-between; align-items: center;">
+        <button id="cancel-install-btn" class="btn-secondary" style="border: none;">Cancel</button>
+        <div id="install-warning-container" style="display: none; flex-direction: column; align-items: flex-end;">
+          <span style="color: #ef4444; font-size: 11px; font-weight: bold; margin-bottom: 4px;">ALREADY INSTALLED</span>
+          <button class="btn-error-disabled" style="padding: 12px 24px; border-radius: 12px; border: none; font-weight: 600;">ADD MOD</button>
+        </div>
+        <button id="confirm-install-btn" class="btn-primary" style="padding-left: 40px; padding-right: 40px;">ADD MOD</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="name-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>New Instance</h3>
+        <p>Give this folder a recognizable name.</p>
+      </div>
+      <input type="text" id="instance-name" placeholder="E.g. Geode 2.204" autocomplete="off" />
+      <div class="modal-footer">
+        <button id="cancel-name-btn" class="btn-secondary">Cancel</button>
+        <button id="save-name-btn" class="btn-primary">Add Instance</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script src="renderer.js"></script>
+</body>
+</html>

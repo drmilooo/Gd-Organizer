@@ -1,0 +1,20 @@
+{
+  "sidebar_logo": "GD ORGANIZER",
+  "add_instance_tip": "Añadir instancia GD",
+  "settings": "Ajustes",
+  "ready": "Listo",
+  "select_instance_title": "Seleccionar instancia",
+  "select_instance_desc": "Elige una carpeta de la barra lateral.",
+  "play_now": "JUGAR AHORA",
+  "add_mod_tooltip": "Añadir mod geode local",
+  "delete_instance_tooltip": "Eliminar instancia de la lista",
+  "installed_mods": "MODS INSTALADOS",
+  "mods_found": "MODS ENCONTRADOS",
+  "updates_soon": "ACTUALIZACIONES (PRONTO)",
+  "settings_title": "Ajustes",
+  "settings_desc": "Personaliza tu GD Organizer",
+  "theme_preference": "Preferenza del tema",
+  "language": "Idioma",
+  "back_to_instances": "Volver a instancias",
+  "about_text": "Creado para la comunidad de Geometry Dash."
+}

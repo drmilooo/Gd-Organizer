@@ -39,6 +39,3 @@ As an additional layer of security, the launcher physically renames disabled mod
 
 ## Development and Contributions
 This project is maintained as a productivity tool for the Geometry Dash community.
-
-**Developer:** drmilooo  
-**GitHub:** [github.com/drmilooo](https://github.com/drmilooo)

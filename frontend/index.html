@@ -153,13 +153,17 @@
           <div class="settings-dashboard">
             <div class="settings-tab-content active" id="tab-general">
               <div class="settings-card">
-                <div class="setting-item">
-                  <label id="label-lang">Language (Beta)</label>
-                  <select class="settings-select" id="lang-select">
-                    <option value="en-EN">English</option>
-                    <option value="ru-RU">Russian (Русский)</option>
-                  </select>
-                </div>
+                  <div style="display: flex; align-items: flex-end; gap: 10px;">
+                    <div style="flex: 1;">
+                      <label id="label-lang">Language (Beta)</label>
+                      <select class="settings-select" id="lang-select">
+                        <option value="en-EN">English</option>
+                        <option value="ru-RU">Russian (Русский)</option>
+                        <option value="ar-EG">Arabic (العربية)</option>
+                      </select>
+                    </div>
+                    <button id="credits-btn" class="secondary-btn" style="height: 38px; padding: 0 20px; font-size: 12px;"></button>
+                  </div>
               </div>
             </div>
 
@@ -466,6 +470,54 @@
   </div>
 
   <script src="renderer.js"></script>
+  <div class="modal-overlay" id="credits-modal">
+    <div class="modal-content" style="max-width: 450px;">
+      <h2 id="credits-modal-title"></h2>
+      <p id="credits-modal-desc"></p>
+      
+      <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px; max-height: 300px; overflow-y: auto; padding-right: 5px;">
+        <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+          <div id="credits-developer-label" style="color: var(--accent); font-weight: bold; font-size: 13px; margin-bottom: 4px;"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="color: var(--text-primary); font-size: 14px;">drmilooo</div>
+            <a href="https://github.com/drmilooo" class="external-link" style="color: var(--accent); text-decoration: none; font-size: 12px;">@drmilooo</a>
+          </div>
+        </div>
+        
+        <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+          <div id="credits-translations-label" style="color: var(--accent); font-weight: bold; font-size: 13px; margin-bottom: 4px;"></div>
+          <div style="color: var(--text-primary); font-size: 14px; display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; justify-content: space-between;">
+              <span>English</span>
+              <a href="https://github.com/drmilooo" class="external-link" style="color: var(--accent); text-decoration: none; font-size: 12px;">@drmilooo</a>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Russian</span>
+              <a href="https://github.com/aceinetx" class="external-link" style="color: var(--accent); text-decoration: none; font-size: 12px;">@aceinetx</a>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Arabic</span>
+              <a href="https://github.com/slyxlz" class="external-link" style="color: var(--accent); text-decoration: none; font-size: 12px;">@slyxlz</a>
+            </div>
+          </div>
+        </div>
+
+        <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+          <div id="credits-thanks-label" style="color: var(--accent); font-weight: bold; font-size: 13px; margin-bottom: 4px;"></div>
+          <div style="color: var(--text-primary); font-size: 14px;">Geode Team, Geometry Dash Community</div>
+        </div>
+
+        <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+          <div id="credits-powered-label" style="color: var(--accent); font-weight: bold; font-size: 13px; margin-bottom: 4px;"></div>
+          <div style="color: var(--text-primary); font-size: 14px;">Wails, Go, Vanilla JS</div>
+        </div>
+      </div>
+
+      <div class="modal-actions" style="margin-top: 25px;">
+        <button class="primary-btn" id="close-credits-btn" style="width: 100%;"></button>
+      </div>
+    </div>
+  </div>
 </body>
 
 </html>

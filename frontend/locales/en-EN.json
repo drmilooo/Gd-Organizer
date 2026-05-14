@@ -47,5 +47,13 @@
   "delete_instance_confirm": "Are you sure you want to remove this instance? This won't delete the actual files.",
   "duplicate_folder_err": "This folder is already in your list!",
   "editing_preset": "Editing Preset",
-  "delete_preset_confirm": "Are you sure you want to delete this preset record?"
+  "delete_preset_confirm": "Are you sure you want to delete this preset record?",
+  "credits_btn": "Credits",
+  "credits_modal_title": "Credits",
+  "credits_modal_desc": "Special thanks to everyone who contributed to GD Organizer.",
+  "credits_developer": "Developer",
+  "credits_translations": "Translations",
+  "credits_special_thanks": "Special Thanks",
+  "credits_powered_by": "Powered By",
+  "credits_close": "Close"
 }

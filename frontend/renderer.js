@@ -158,10 +158,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const labL = document.getElementById('label-lang');
       const labT = document.getElementById('label-theme');
-      const labLT = document.getElementById('label-live-theme');
-      const labAcc = document.getElementById('label-accent');
       if (labL) labL.textContent = dict.language;
       if (labT) labT.textContent = dict.theme_preference;
+
+      const creditsBtn = document.getElementById('credits-btn');
+      if (creditsBtn) creditsBtn.textContent = dict.credits_btn || "Credits";
+      
+      const setElementText = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+      };
+
+      setElementText('credits-modal-title', dict.credits_modal_title);
+      setElementText('credits-modal-desc', dict.credits_modal_desc);
+      setElementText('credits-developer-label', dict.credits_developer);
+      setElementText('credits-translations-label', dict.credits_translations);
+      setElementText('credits-thanks-label', dict.credits_special_thanks);
+      setElementText('credits-powered-label', dict.credits_powered_by);
+      setElementText('close-credits-btn', dict.credits_close);
+      const labLT = document.getElementById('label-live-theme');
+      const labAcc = document.getElementById('label-accent');
       if (labLT) labLT.textContent = dict.live_theme_preference || "Live Themes";
       if (labAcc) labAcc.textContent = dict.accent_color;
 
@@ -274,14 +290,37 @@ document.addEventListener('DOMContentLoaded', () => {
     backHomeBtn.addEventListener('click', () => toggleSettingsMode(false));
   }
 
+  const creditsBtn = document.getElementById('credits-btn');
+  const creditsModal = document.getElementById('credits-modal');
+  const closeCreditsBtn = document.getElementById('close-credits-btn');
+
+  if (creditsBtn) {
+    creditsBtn.addEventListener('click', () => {
+      creditsModal.classList.add('active');
+    });
+  }
+  if (closeCreditsBtn) {
+    closeCreditsBtn.addEventListener('click', () => {
+      creditsModal.classList.remove('active');
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    const extLink = e.target.closest('.external-link');
+    if (extLink) {
+      e.preventDefault();
+      const url = extLink.getAttribute('href');
+      if (window.runtime && window.runtime.BrowserOpenURL) {
+        window.runtime.BrowserOpenURL(url);
+      } else {
+        window.open(url, '_blank');
+      }
+    }
+  });
+
   const modSearchInput = document.getElementById('mod-search');
-  modSearchInput.addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase();
-    const filtered = currentMods.filter(m =>
-      m.name.toLowerCase().includes(term) ||
-      m.id.toLowerCase().includes(term)
-    );
-    renderMods(filtered);
+  modSearchInput.addEventListener('input', () => {
+    renderMods(currentMods);
   });
 
   document.querySelectorAll('.settings-nav-item').forEach(item => {
@@ -574,6 +613,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderMods(mods) {
+    const searchTerm = document.getElementById('mod-search').value.toLowerCase();
+    const modsToRender = mods.filter(m => 
+      m.name.toLowerCase().includes(searchTerm) || 
+      m.id.toLowerCase().includes(searchTerm)
+    );
+
     modsListEl.innerHTML = '';
     const folder = folders.find(f => f.id === currentSelectionId);
     if (!folder) return;
@@ -591,7 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
       headerTitle.textContent = modeText;
     }
 
-    mods.forEach(mod => {
+    modsToRender.forEach(mod => {
       try {
         const isEnabled = preset ? (preset.mods[mod.id] === true) : mod.enabled;
         const isChecked = isEnabled ? 'checked' : '';
@@ -812,41 +857,51 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!pendingToggle) return;
     const { mod, dependents } = pendingToggle;
     const selected = folders.find(f => f.id === currentSelectionId);
+    if (!selected) return;
+
+    let preset = activePresetId ? selected.presets.find(p => p.id === activePresetId) : null;
 
     for (const d of dependents) {
-      await window.electronAPI.toggleMod(selected.path, d.id, false);
-      const card = Array.from(modsListEl.querySelectorAll('.mod-card')).find(c => c.querySelector('input').getAttribute('data-id') === d.id);
-      if (card) {
-        card.querySelector('input').checked = false;
+      await window.electronAPI.toggleMod(selected.path, d.id, false, d.file);
+      if (preset) {
+        preset.mods[d.id] = false;
+      } else {
+        d.enabled = false;
       }
-      d.enabled = false;
     }
 
-    await window.electronAPI.toggleMod(selected.path, mod.id, false);
-    const targetCard = Array.from(modsListEl.querySelectorAll('.mod-card')).find(c => c.querySelector('input').getAttribute('data-id') === mod.id);
-    if (targetCard) {
-      targetCard.querySelector('input').checked = false;
+    await window.electronAPI.toggleMod(selected.path, mod.id, false, mod.file);
+    if (preset) {
+      preset.mods[mod.id] = false;
+      saveFolders();
+    } else {
+      mod.enabled = false;
     }
-    mod.enabled = false;
 
     depModal.classList.remove('active');
     pendingToggle = null;
+    renderMods(currentMods);
   });
 
   disableOnlyBtn.addEventListener('click', async () => {
     if (!pendingToggle) return;
     const { mod } = pendingToggle;
     const selected = folders.find(f => f.id === currentSelectionId);
+    if (!selected) return;
 
-    await window.electronAPI.toggleMod(selected.path, mod.id, false);
-    const targetCard = Array.from(modsListEl.querySelectorAll('.mod-card')).find(c => c.querySelector('input').getAttribute('data-id') === mod.id);
-    if (targetCard) {
-      targetCard.querySelector('input').checked = false;
+    let preset = activePresetId ? selected.presets.find(p => p.id === activePresetId) : null;
+
+    await window.electronAPI.toggleMod(selected.path, mod.id, false, mod.file);
+    if (preset) {
+      preset.mods[mod.id] = false;
+      saveFolders();
+    } else {
+      mod.enabled = false;
     }
-    mod.enabled = false;
 
     depModal.classList.remove('active');
     pendingToggle = null;
+    renderMods(currentMods);
   });
 
   cancelDepBtn.addEventListener('click', () => {

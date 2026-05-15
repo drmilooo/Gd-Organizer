@@ -40,6 +40,39 @@ func (a *App) startup(ctx context.Context) {
 	}()
 }
 
+func (a *App) getSavePath(filename string) string {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		configDir = os.Getenv("APPDATA")
+	}
+	dir := filepath.Join(configDir, "GD-Organizer")
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			fmt.Println("Error creating config dir:", err)
+		}
+	}
+	return filepath.Join(dir, filename)
+}
+
+func (a *App) SaveData(filename string, content string) error {
+	path := a.getSavePath(filename)
+	err := os.WriteFile(path, []byte(content), 0644)
+	if err != nil {
+		fmt.Printf("Error saving %s: %v\n", filename, err)
+	}
+	return err
+}
+
+func (a *App) LoadData(filename string) string {
+	path := a.getSavePath(filename)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
 type GameAnalysis struct {
 	HasGeode bool   `json:"hasGeode"`
 	Version  string `json:"version"`

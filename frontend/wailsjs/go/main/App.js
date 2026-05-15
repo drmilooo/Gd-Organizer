@@ -42,6 +42,10 @@ export function LaunchGame(arg1) {
   return window['go']['main']['App']['LaunchGame'](arg1);
 }
 
+export function LoadData(arg1) {
+  return window['go']['main']['App']['LoadData'](arg1);
+}
+
 export function MinimizeWindow() {
   return window['go']['main']['App']['MinimizeWindow']();
 }
@@ -52,6 +56,10 @@ export function OpenFile(arg1) {
 
 export function OpenFolder() {
   return window['go']['main']['App']['OpenFolder']();
+}
+
+export function SaveData(arg1, arg2) {
+  return window['go']['main']['App']['SaveData'](arg1, arg2);
 }
 
 export function ToggleMod(arg1, arg2, arg3, arg4) {

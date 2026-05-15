@@ -22,6 +22,8 @@
       fetchModInfo: (id) => window.go.main.App.FetchModInfo(id),
       browseCatalog: (page, query, ver) => window.go.main.App.BrowseCatalog(page, query, ver),
       downloadCatalogMod: (p, url, id) => window.go.main.App.DownloadCatalogMod(p, url, id),
+      saveData: (file, data) => window.go.main.App.SaveData(file, data),
+      loadData: (file) => window.go.main.App.LoadData(file),
       close: () => window.runtime.Quit(),
       minimize: () => window.runtime.WindowMinimise()
     };
@@ -172,16 +174,16 @@
                 <div class="setting-item">
                   <label id="label-theme">Standard Themes</label>
                   <div class="theme-choices">
-                    <div class="theme-card" id="theme-dark-btn">Dark</div>
-                    <div class="theme-card" id="theme-light-btn">Light</div>
-                    <div class="theme-card" id="theme-system-btn">System</div>
+                    <div class="theme-card" id="theme-dark-btn" data-theme="dark">Dark</div>
+                    <div class="theme-card" id="theme-light-btn" data-theme="light">Light</div>
+                    <div class="theme-card" id="theme-system-btn" data-theme="system">System</div>
                   </div>
 
                   <label id="label-live-theme" style="margin-top: 20px; display: block;">Live Themes</label>
                   <div class="theme-choices">
-                    <div class="theme-card" id="theme-black-hole-btn">Black Hole</div>
-                    <div class="theme-card" id="theme-nullscapes-btn">Nullscapes</div>
-                    <div class="theme-card" id="theme-kocmoc-btn" style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+                    <div class="theme-card" id="theme-black-hole-btn" data-theme="black-hole">Black Hole</div>
+                    <div class="theme-card" id="theme-nullscapes-btn" data-theme="nullscapes">Nullscapes</div>
+                    <div class="theme-card" id="theme-kocmoc-btn" data-theme="kocmoc" style="display: flex; align-items: center; gap: 8px; justify-content: center;">
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="color: #000; filter: drop-shadow(0 0 2px rgba(255,255,255,0.3));">
                         <path d="M12 2l2.4 7.4h7.6l-6.2 4.5 2.4 7.4-6.2-4.5-6.2 4.5 2.4-7.4-6.2-4.5h7.6z" />
                       </svg>
@@ -213,7 +215,7 @@
             <div class="settings-tab-content" id="tab-about" style="display: none;">
               <div class="about-section">
                 <h3 id="about-title">GD Organizer</h3>
-                <p id="about-version">Client Version : v1.0.0</p>
+                <p id="about-version">Client Version : v1.0.2</p>
                 <div class="about-description"
                   style="margin-top: 12px; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
                   <p>GD Organizer is a lightweight launcher and mod manager for Geometry Dash. It helps you easily

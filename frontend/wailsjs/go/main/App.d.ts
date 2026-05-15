@@ -23,10 +23,14 @@ export function InstallMod(arg1:string,arg2:string):Promise<Record<string, any>>
 
 export function LaunchGame(arg1:string):Promise<void>;
 
+export function LoadData(arg1:string):Promise<string>;
+
 export function MinimizeWindow():Promise<void>;
 
 export function OpenFile(arg1:Array<frontend.FileFilter>):Promise<string>;
 
 export function OpenFolder():Promise<string>;
+
+export function SaveData(arg1:string,arg2:string):Promise<void>;
 
 export function ToggleMod(arg1:string,arg2:string,arg3:boolean,arg4:string):Promise<Record<string, any>>;

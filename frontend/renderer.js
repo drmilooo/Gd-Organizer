@@ -46,10 +46,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const themeCards = document.querySelectorAll('.theme-card');
   const accentBtns = document.querySelectorAll('.accent-color-btn');
 
-  let currentSettings = JSON.parse(localStorage.getItem('gd-settings') || '{"theme":"dark","lang":"en-EN","accent":"#0084cc","accentRgb":"0, 132, 204"}');
-  const _appSignature = 'drmilooo';
+  let folders = [];
+  const defaultSettings = { "theme": "dark", "lang": "en-EN", "accent": "#0084cc", "accentRgb": "0, 132, 204" };
+  let currentSettings = { ...defaultSettings };
+  let isInitializing = true;
 
-  function applyTheme(theme) {
+  let currentSelectionId = null;
+  let pendingFolderPath = null;
+  let currentMods = [];
+  let pendingToggle = null;
+  let pendingInstallPath = null;
+  let modUpdates = {};
+  let checkingUpdates = false;
+  let pendingPresetFolder = null;
+  let currentDict = {};
+
+  async function applyTheme(theme, shouldSave = true) {
     document.body.classList.remove('light', 'dark', 'midnight', 'black-hole', 'nullscapes', 'kocmoc');
     let target = theme.toLowerCase().replace(/\s+/g, '-');
     
@@ -78,14 +90,16 @@ document.addEventListener('DOMContentLoaded', () => {
       kmVid.play().catch(e => console.log("Video Play Error:", e));
     }
 
-    currentSettings.theme = theme;
-    saveSettings();
+    if (shouldSave) {
+      currentSettings.theme = theme;
+      await saveSettings();
+    }
 
     const grayBtn = document.getElementById('accent-gray-btn');
     const allAccentBtns = document.querySelectorAll('.accent-color-btn');
     
     if (target === 'kocmoc') {
-      applyAccentColor('#808080', '128, 128, 128');
+      await applyAccentColor('#808080', '128, 128, 128', shouldSave);
       allAccentBtns.forEach(btn => {
         if (btn.id === 'accent-gray-btn') btn.style.display = 'block';
         else btn.style.display = 'none';
@@ -96,25 +110,27 @@ document.addEventListener('DOMContentLoaded', () => {
         else btn.style.display = 'block';
       });
       if (currentSettings.accent === '#808080') {
-        applyAccentColor('#0084cc', '0, 132, 204');
+        await applyAccentColor('#0084cc', '0, 132, 204', shouldSave);
       }
     }
 
     themeCards.forEach(card => {
       card.classList.remove('active');
-      if (card.textContent.trim().toLowerCase() === theme.toLowerCase()) card.classList.add('active');
+      if (card.getAttribute('data-theme') === theme) card.classList.add('active');
     });
   }
 
-  function applyAccentColor(hex, rgb) {
+  async function applyAccentColor(hex, rgb, shouldSave = true) {
     document.documentElement.style.setProperty('--accent', hex);
     document.documentElement.style.setProperty('--accent-rgb', rgb);
 
     document.documentElement.style.setProperty('--accent-hover', hex);
 
-    currentSettings.accent = hex;
-    currentSettings.accentRgb = rgb;
-    saveSettings();
+    if (shouldSave) {
+      currentSettings.accent = hex;
+      currentSettings.accentRgb = rgb;
+      await saveSettings();
+    }
 
     accentBtns.forEach(btn => {
       btn.classList.remove('active');
@@ -122,8 +138,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function saveSettings() {
-    localStorage.setItem('gd-settings', JSON.stringify(currentSettings));
+  async function saveSettings() {
+    if (isInitializing) return;
+    await window.electronAPI.saveData('settings.json', JSON.stringify(currentSettings));
   }
 
   async function applyLanguage(code) {
@@ -133,42 +150,26 @@ document.addEventListener('DOMContentLoaded', () => {
       const dict = await response.json();
       currentDict = dict;
 
-      const logoEl = document.getElementById('sidebar-logo');
-      if (logoEl) logoEl.textContent = dict.sidebar_logo;
-      const addBtn = document.getElementById('add-folder-btn');
-      if (addBtn) addBtn.title = dict.add_instance_tip;
-
-      const navG = document.getElementById('nav-general');
-      const navA = document.getElementById('nav-appearance');
-      const navAb = document.getElementById('nav-about');
-      if (navG) navG.textContent = dict.settings_nav_general || "General";
-      if (navA) navA.textContent = dict.settings_nav_appearance || "Appearance";
-      if (navAb) navAb.textContent = dict.settings_nav_about || "About";
-
-      const backHome = document.getElementById('back-home-text');
-      if (backHome) backHome.textContent = dict.back_to_instances;
-
-      const settingsTxt = document.getElementById('settings-text');
-      if (settingsTxt) settingsTxt.textContent = dict.settings;
-
-      const setT = document.getElementById('settings-view-title');
-      const setD = document.getElementById('settings-view-desc');
-      if (setT) setT.textContent = dict.settings_title;
-      if (setD) setD.textContent = dict.settings_desc;
-
-      const labL = document.getElementById('label-lang');
-      const labT = document.getElementById('label-theme');
-      if (labL) labL.textContent = dict.language;
-      if (labT) labT.textContent = dict.theme_preference;
-
-      const creditsBtn = document.getElementById('credits-btn');
-      if (creditsBtn) creditsBtn.textContent = dict.credits_btn || "Credits";
-      
       const setElementText = (id, text) => {
         const el = document.getElementById(id);
         if (el) el.textContent = text;
       };
 
+      setElementText('sidebar-logo', dict.sidebar_logo);
+      const addBtn = document.getElementById('add-folder-btn');
+      if (addBtn) addBtn.title = dict.add_instance_tip;
+
+      setElementText('nav-general', dict.settings_nav_general || "General");
+      setElementText('nav-appearance', dict.settings_nav_appearance || "Appearance");
+      setElementText('nav-about', dict.settings_nav_about || "About");
+      setElementText('back-home-text', dict.back_to_instances);
+      setElementText('settings-text', dict.settings);
+      setElementText('settings-view-title', dict.settings_title);
+      setElementText('settings-view-desc', dict.settings_desc);
+      setElementText('label-lang', dict.language);
+      setElementText('label-theme', dict.theme_preference);
+      setElementText('credits-btn', dict.credits_btn || "Credits");
+      
       setElementText('credits-modal-title', dict.credits_modal_title);
       setElementText('credits-modal-desc', dict.credits_modal_desc);
       setElementText('credits-developer-label', dict.credits_developer);
@@ -176,66 +177,62 @@ document.addEventListener('DOMContentLoaded', () => {
       setElementText('credits-thanks-label', dict.credits_special_thanks);
       setElementText('credits-powered-label', dict.credits_powered_by);
       setElementText('close-credits-btn', dict.credits_close);
-      const labLT = document.getElementById('label-live-theme');
-      const labAcc = document.getElementById('label-accent');
-      if (labLT) labLT.textContent = dict.live_theme_preference || "Live Themes";
-      if (labAcc) labAcc.textContent = dict.accent_color;
+      
+      setElementText('label-live-theme', dict.live_theme_preference || "Live Themes");
+      setElementText('label-accent', dict.accent_color);
 
-      document.getElementById('theme-dark-btn').textContent = dict.theme_dark;
-      document.getElementById('theme-light-btn').textContent = dict.theme_light;
-      document.getElementById('theme-system-btn').textContent = dict.theme_system || "System";
-      document.getElementById('theme-black-hole-btn').textContent = dict.theme_black_hole || "Black Hole";
-      document.getElementById('theme-nullscapes-btn').textContent = dict.theme_nullscapes || "Nullscapes";
-      document.getElementById('theme-kocmoc-btn').querySelector('span').textContent = dict.theme_kocmoc || "Kocmoc";
+      setElementText('theme-dark-btn', dict.theme_dark);
+      setElementText('theme-light-btn', dict.theme_light);
+      setElementText('theme-system-btn', dict.theme_system || "System");
+      setElementText('theme-black-hole-btn', dict.theme_black_hole || "Black Hole");
+      setElementText('theme-nullscapes-btn', dict.theme_nullscapes || "Nullscapes");
+      setElementText('theme-kocmoc-btn', dict.theme_kocmoc || "Kocmoc");
 
-      const abT = document.getElementById('about-title');
-      const abD = document.getElementById('about-desc');
-      if (abT) abT.textContent = dict.about_title || "GD Organizer";
-      if (abD) abD.textContent = dict.about_text;
-
-      const noT = document.getElementById('no-selection-title');
-      const noD = document.getElementById('no-selection-desc');
-      if (noT) noT.textContent = dict.select_instance_title;
-      if (noD) noD.textContent = dict.select_instance_desc;
-
-      const playT = document.getElementById('play-btn-text');
-      if (playT) playT.textContent = dict.play_now;
+      setElementText('no-selection-title', dict.select_instance_title);
+      setElementText('no-selection-desc', dict.select_instance_desc);
+      setElementText('play-btn-text', dict.play_now);
 
       const addM = document.getElementById('add-mod-file-btn');
       const delI = document.getElementById('delete-instance-btn');
       if (addM) addM.title = dict.add_mod_tooltip;
       if (delI) delI.title = dict.delete_instance_tooltip;
 
-      const modsH = document.getElementById('mods-header-title');
-      const modsF = document.getElementById('mods-found-text');
-      if (modsH) modsH.textContent = dict.installed_mods;
-      if (modsF) modsF.textContent = dict.mods_found;
+      setElementText('mods-header-title', dict.installed_mods);
+      setElementText('mods-found-text', dict.mods_found);
 
-      document.getElementById('instance-modal-title').textContent = dict.instance_modal_title;
-      document.getElementById('instance-modal-desc').textContent = dict.instance_modal_desc;
-      document.getElementById('instance-name').placeholder = dict.instance_input_placeholder;
-      document.getElementById('save-name-btn').textContent = dict.instance_add_btn;
-      document.getElementById('cancel-name-btn').textContent = dict.instance_cancel_btn;
+      setElementText('instance-modal-title', dict.instance_modal_title);
+      setElementText('instance-modal-desc', dict.instance_modal_desc);
+      const instanceInput = document.getElementById('instance-name');
+      if (instanceInput) instanceInput.placeholder = dict.instance_input_placeholder;
+      setElementText('save-name-btn', dict.instance_add_btn);
+      setElementText('cancel-name-btn', dict.instance_cancel_btn);
 
-      document.getElementById('preset-modal-title').textContent = dict.preset_modal_title;
-      document.getElementById('preset-modal-desc').textContent = dict.preset_modal_desc;
-      document.getElementById('preset-name-input').placeholder = dict.preset_input_placeholder;
-      document.getElementById('save-preset-btn').textContent = dict.preset_add_btn;
-      document.getElementById('cancel-preset-btn').textContent = dict.preset_cancel_btn;
+      setElementText('preset-modal-title', dict.preset_modal_title);
+      setElementText('preset-modal-desc', dict.preset_modal_desc);
+      const presetInput = document.getElementById('preset-name-input');
+      if (presetInput) presetInput.placeholder = dict.preset_input_placeholder;
+      setElementText('save-preset-btn', dict.preset_add_btn);
+      setElementText('cancel-preset-btn', dict.preset_cancel_btn);
+
+      setElementText('about-title', dict.about_title || "GD Organizer");
+      setElementText('about-desc', dict.about_text);
 
       currentSettings.lang = code;
-      localStorage.setItem('gd-settings', JSON.stringify(currentSettings));
-      langSelect.value = code;
+      if (!isInitializing) await saveSettings();
+      if (langSelect) langSelect.value = code;
 
       renderFolders();
       if (currentSelectionId) renderMods(currentMods);
 
-    } catch (e) { console.error("Lang Load Error:", e); }
+    } catch (e) {
+      console.error("Language load failed:", e);
+    }
   }
 
   themeCards.forEach(card => {
     card.addEventListener('click', () => {
-      applyTheme(card.textContent.trim());
+      const themeId = card.getAttribute('data-theme');
+      applyTheme(themeId);
     });
   });
 
@@ -335,19 +332,53 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  let folders = JSON.parse(localStorage.getItem('gd-folders') || '[]');
-  let currentSelectionId = null;
-  let pendingFolderPath = null;
-  let currentMods = [];
-  let pendingToggle = null;
-  let pendingInstallPath = null;
-  let modUpdates = {};
-  let checkingUpdates = false;
-  let pendingPresetFolder = null;
-  let currentDict = {};
+  async function initApp() {
+    try {
+      const rawFolders = await window.electronAPI.loadData('folders.json');
+      if (rawFolders) {
+        folders = JSON.parse(rawFolders);
+      } else {
+        const localFolders = localStorage.getItem('gd-folders');
+        if (localFolders) {
+          folders = JSON.parse(localFolders);
+          await saveFolders();
+        }
+      }
 
-  function saveFolders() {
-    localStorage.setItem('gd-folders', JSON.stringify(folders));
+      const rawSettings = await window.electronAPI.loadData('settings.json');
+      if (rawSettings) {
+        try {
+          const parsed = JSON.parse(rawSettings);
+          currentSettings = { ...defaultSettings, ...parsed };
+        } catch (e) {
+          console.error("Settings JSON parse error:", e);
+        }
+      } else {
+        const localSettings = localStorage.getItem('gd-settings');
+        if (localSettings) {
+          try {
+            const parsed = JSON.parse(localSettings);
+            currentSettings = { ...defaultSettings, ...parsed };
+            await saveSettings();
+          } catch (e) {}
+        }
+      }
+    } catch (e) {
+      console.error("Primary data load failed:", e);
+    }
+
+    // Set UI with final settings
+    await applyTheme(currentSettings.theme || "dark", false);
+    await applyAccentColor(currentSettings.accent || "#0084cc", currentSettings.accentRgb || "0, 132, 204", false);
+    await applyLanguage(currentSettings.lang || "en-EN");
+    renderFolders();
+    
+    // END initialization
+    isInitializing = false;
+  }
+
+  async function saveFolders() {
+    await window.electronAPI.saveData('folders.json', JSON.stringify(folders));
   }
 
   function renderFolders() {
@@ -1224,5 +1255,5 @@ document.addEventListener('DOMContentLoaded', () => {
     if (catalogPage < totalPages) { catalogPage++; loadCatalog(); }
   });
 
-  renderFolders();
+  initApp();
 });

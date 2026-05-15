@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let isInitializing = true;
 
   let currentSelectionId = null;
+  let activePresetId = null;
   let pendingFolderPath = null;
   let currentMods = [];
   let pendingToggle = null;
@@ -378,6 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function saveFolders() {
+    if (isInitializing) return;
     await window.electronAPI.saveData('folders.json', JSON.stringify(folders));
   }
 
@@ -989,6 +991,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   saveNameBtn.onclick = async () => {
+    if (isInitializing) return;
     const name = instanceNameInput.value.trim() || 'Untitled Instance';
     if (pendingFolderPath) {
       if (folders.some(f => f.path === pendingFolderPath)) {

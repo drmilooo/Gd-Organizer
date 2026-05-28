@@ -1,45 +1,27 @@
-# Readme
+# GD Organizer - Changelog (v1.1.0)
 
-## Latest Stable: v1.0.0  
+List of technical updates and changes made to the GD Organizer project.
 
-## Description
-This app helps you to manage instances (like GDPS and Vanilla and Geode in same app) and set presets with user-friendly interface. Also you can download mods without even launching the game.
+### Core Changes
+- Migrated the project infrastructure from Vanilla JS to Vue 3 and Vite.
+- Replaced PowerShell scripts used for game analysis and version detection with native Go (Golang) code.
+- Fixed the white screen flicker that occurred during application startup.
 
-## Contributing a Translation
+### GDPS and Instance Management
+- Implemented a system to detect GDPS (Private Servers) by scanning .exe binaries for server URLs.
+- Added automatic downloading and displaying of GDPS logos directly from their server URLs.
+- Integrated specific icons and status indicators to distinguish between GDPS, Vanilla, and Geode instances.
+- Added an option to close the launcher upon game start, featuring a 3-second delay to allow the game window to initialize.
 
-Want to see GDOrganizer in your language? You can add it yourself!
+### UI and Localization
+- Redesigned the settings page layout to match the mod list interface.
+- Expanded language support (English, Russian, Arabic).
+- Fixed button scaling and broken links in the Credits section.
+- Improved the visual consistency of icons in the sidebar.
 
-### How It Works?
-
-All translations live inside `frontend/locales/`. Each language has its own `.json` file named with a locale code (e.g. `en-EN.json` for English, `ru-RU.json` for Russian). The English file is the base — every key in there is used somewhere in the app. You just need to copy it, translate the values, and submit it.
-
-### Steps
-
-1. **Fork the repository** on GitHub and clone it to your machine.
-
-2. **Go to the `frontend/locales/` folder.** You'll see `en-EN.json` — that's your reference file.
-
-3. **Copy `en-EN.json`** and rename it to match your language. Use the standard locale format:
-   - `fr-FR.json` for French
-   - `de-DE.json` for German
-   - `ja-JP.json` for Japanese
-   - `pt-BR.json` for Brazilian Portuguese
-   -You can find the full list of locale codes on 
-    (https://en.wikipedia.org/wiki/IETF_language_tag)
-
-4. **Open your new file and translate every value.** Don't change the keys (the left side), only change the values (the right side). For example:
-   ```json
-   "play_now": "Launch"        ← keep the key
-   "play_now": "Lancer"        ← translate the value
-   ```
-
-5. **Don't skip any keys.** If you leave a value empty, the app will show a blank string in that spot.
-
-6. **Commit your file, push it to your fork, and open a Pull Request.** That's it.
-
-### Things to Keep in Mind
-
-- Keep the JSON format valid. If you're not sure, paste your file into [jsonlint.com](https://jsonlint.com) to check for syntax errors.
-- Don't translate the keys, only the values.
-- Some values have technical terms like "Geode" or "Geometry Dash" — leave those as-is.
-- If a new version adds keys that your translation doesn't have yet, the app will fall back to showing the English text for those missing keys.
+### Technical Stack
+- Backend: Go / Wails
+- Frontend: Vue 3 / Vite
+- Supported Locales: en-EN, ru-RU, ar-EG
+### Contact
+If you find any bugs, you can contact me on Discord: [drmiloo](https://discord.com/users/drmiloo)

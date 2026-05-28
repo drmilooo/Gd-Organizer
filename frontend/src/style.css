@@ -15,6 +15,31 @@
   --font-main: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
 }
 
+/* Custom Modern Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
 body.light {
   --bg-app: #ffffff;
   --bg-sidebar: #f2f3f5;
@@ -45,7 +70,7 @@ body.black-hole {
   --border: #1a1a1a;
 }
 
-body.kocmoc {
+body.kocmoc, body.heliopolis {
   --bg-app: transparent;
   --bg-sidebar: rgba(19, 19, 19, 0.45);
   --bg-card: rgba(30, 30, 30, 0.4);
@@ -55,7 +80,7 @@ body.kocmoc {
   --border: rgba(255, 255, 255, 0.05);
 }
 
-body.kocmoc .sidebar {
+body.kocmoc .sidebar, body.heliopolis .sidebar {
   background: var(--bg-sidebar) !important;
   backdrop-filter: blur(15px);
   border-right: 1px solid rgba(255, 255, 255, 0.05);
@@ -84,7 +109,7 @@ body.nullscapes {
   opacity: 0.8;
 }
 
-body.kocmoc .theme-bg-video {
+body.kocmoc .theme-bg-video, body.heliopolis .theme-bg-video {
   left: 0;
   width: 100%;
 }
@@ -92,6 +117,7 @@ body.kocmoc .theme-bg-video {
 body.black-hole .black-hole-bg { display: block; }
 body.nullscapes .nullscapes-bg { display: block; }
 body.kocmoc .kocmoc-bg { display: block; }
+body.heliopolis .heliopolis-bg { display: block; }
 
 body.black-hole .main-content,
 body.nullscapes .main-content,
@@ -106,9 +132,12 @@ body.nullscapes .mod-card,
 body.nullscapes .theme-card,
 body.kocmoc .mod-card,
 body.kocmoc .theme-card,
+body.heliopolis .mod-card,
+body.heliopolis .theme-card,
 body.black-hole .about-section,
 body.nullscapes .about-section,
-body.kocmoc .about-section {
+body.kocmoc .about-section,
+body.heliopolis .about-section {
   backdrop-filter: blur(10px);
   background: rgba(49, 51, 56, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -116,7 +145,8 @@ body.kocmoc .about-section {
 
 body.black-hole .settings-card,
 body.nullscapes .settings-card,
-body.kocmoc .settings-card {
+body.kocmoc .settings-card,
+body.heliopolis .settings-card {
   background: transparent !important;
   border: none !important;
   backdrop-filter: none !important;
@@ -292,12 +322,7 @@ body {
 }
 
 .folder-list::-webkit-scrollbar {
-  width: 4px;
-}
-
-.folder-list::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 10px;
+  display: none;
 }
 
 .folder-item {
@@ -806,14 +831,7 @@ body {
   margin-bottom: 20px;
 }
 
-.mods-grid::-webkit-scrollbar {
-  width: 4px;
-}
-
-.mods-grid::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 10px;
-}
+/* Clean up specific scrollbars in favor of global ones */
 
 .mod-card {
   background: rgba(255,255,255,0.02);

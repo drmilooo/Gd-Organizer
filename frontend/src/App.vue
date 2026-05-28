@@ -89,7 +89,7 @@ onMounted(() => {
   const accentBtns = document.querySelectorAll('.accent-color-btn');
 
   let folders = [];
-  const defaultSettings = { "theme": "dark", "lang": "en-EN", "accent": "#0084cc", "accentRgb": "0, 132, 204", "closeOnLaunch": false };
+  const defaultSettings = { "theme": "dark", "lang": "en-EN", "accent": "#0084cc", "accentRgb": "0, 132, 204", "closeOnLaunch": false, "uiScale": "1.0", "optimizeWallpaper": true };
   let currentSettings = { ...defaultSettings };
   let isInitializing = true;
 
@@ -103,6 +103,10 @@ onMounted(() => {
   let checkingUpdates = false;
   let pendingPresetFolder = null;
   let currentDict = {};
+  
+  // Wallpaper State (Deep Sleep)
+  let savedTime = 0;
+  let activeLiveTheme = null;
 
   // VUE STATE SYNC (Vanilla -> Vue Store)
   function syncState() {
@@ -150,33 +154,19 @@ onMounted(() => {
   };
 
   async function applyTheme(theme, shouldSave = true) {
-    document.body.classList.remove('light', 'dark', 'midnight', 'black-hole', 'nullscapes', 'kocmoc');
+    document.body.classList.remove('light', 'dark', 'midnight', 'black-hole', 'nullscapes', 'kocmoc', 'heliopolis');
     let target = theme.toLowerCase().replace(/\s+/g, '-');
     
     if (target === 'system') {
       target = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
 
-    if (['light', 'dark', 'black-hole', 'nullscapes', 'kocmoc'].includes(target)) {
+    if (['light', 'dark', 'black-hole', 'nullscapes', 'kocmoc', 'heliopolis'].includes(target)) {
       document.body.classList.add(target);
     }
 
-    const bhVid = document.getElementById('black-hole-video');
-    const nsVid = document.getElementById('nullscapes-video');
-    const kmVid = document.getElementById('kocmoc-video');
-
-    if (bhVid) { bhVid.pause(); bhVid.currentTime = 0; }
-    if (nsVid) { nsVid.pause(); nsVid.currentTime = 0; }
-    if (kmVid) { kmVid.pause(); }
-
-    if (target === 'black-hole' && bhVid) {
-      bhVid.play().catch(e => console.log("Video Play Error:", e));
-    } else if (target === 'nullscapes' && nsVid) {
-      nsVid.playbackRate = 0.7;
-      nsVid.play().catch(e => console.log("Video Play Error:", e));
-    } else if (target === 'kocmoc' && kmVid) {
-      kmVid.play().catch(e => console.log("Video Play Error:", e));
-    }
+    // Dynamic RAM Optimization: Handle wallpaper existence
+    updateLiveWallpaper(target);
 
     if (shouldSave) {
       currentSettings.theme = theme;
@@ -224,6 +214,84 @@ onMounted(() => {
       btn.classList.remove('active');
       if (btn.getAttribute('data-color') === hex) btn.classList.add('active');
     });
+  }
+
+  async function applyUIScale(scale, shouldSave = true) {
+    // Current logic: window resize instead of zoom
+    let w = 1000;
+    let h = 700;
+    
+    if (scale === "0.85") { w = 850; h = 600; }
+    else if (scale === "1.0") { w = 1000; h = 700; }
+    else if (scale === "1.15") { w = 1200; h = 840; }
+
+    if (runtime && runtime.WindowSetSize) {
+      runtime.WindowSetSize(w, h);
+      // Small delay to ensure resize completes, then force wake just in case blur/visibility triggered
+      setTimeout(() => {
+        handleWake();
+      }, 100);
+    }
+    
+    // Ensure root scale variable is still set if any CSS uses it
+    document.documentElement.style.setProperty('--ui-scale', scale);
+
+    if (shouldSave) {
+      currentSettings.uiScale = scale;
+      await saveSettings();
+    }
+
+    document.querySelectorAll('.ui-scale-btn').forEach(btn => {
+      btn.classList.remove('active');
+      if (btn.getAttribute('data-scale') === String(scale)) btn.classList.add('active');
+    });
+  }
+
+  function updateLiveWallpaper(target) {
+    const container = document.getElementById('theme-bg-container');
+    if (!container) return;
+
+    // Clear background
+    container.innerHTML = '';
+
+    const liveThemes = {
+      'black-hole': { src: '/bhppr.webm', class: 'black-hole-bg' },
+      'nullscapes': { src: '/nullscapes.webm', class: 'nullscapes-bg', rate: 0.7 },
+      'kocmoc': { src: '/kocmoc.webm', class: 'kocmoc-bg' },
+      'heliopolis': { src: '/heliopolis.webm', class: 'heliopolis-bg', start: 8, loopReset: 20 }
+    };
+
+    const config = liveThemes[target];
+    if (config) {
+      const video = document.createElement('video');
+      video.className = `theme-bg-video ${config.class}`;
+      video.muted = true;
+      video.loop = !config.loopReset; // If manual loop logic needed, loop is handled by event
+      video.playsInline = true;
+      video.style.display = 'block';
+      
+      const source = document.createElement('source');
+      source.src = config.src;
+      source.type = config.src.endsWith('.webm') ? 'video/webm' : 'video/mp4';
+      video.appendChild(source);
+
+      if (config.rate) video.playbackRate = config.rate;
+      if (config.start) video.onloadedmetadata = () => { video.currentTime = config.start; };
+
+      if (config.loopReset) {
+        video.ontimeupdate = () => {
+          if (video.currentTime >= config.loopReset) video.currentTime = config.start || 0;
+        };
+      }
+
+      container.appendChild(video);
+      video.play().catch(e => console.log("Dynamic Video Error:", e));
+      
+      // Update state for Deep Sleep wake/sleep
+      activeLiveTheme = target;
+    } else {
+      activeLiveTheme = null;
+    }
   }
 
   async function saveSettings() {
@@ -305,6 +373,9 @@ onMounted(() => {
       setElementText('about-title', dict.about_title || "GD Organizer");
       setElementText('about-desc', dict.about_text);
       setElementText('label-close-on-launch', dict.close_on_launch || "Close Launcher on Game Start");
+      setElementText('label-ui-scale', dict.ui_scale || "UI Mode (Scaling)");
+      setElementText('label-launcher-behavior', dict.launcher_behavior || "Launcher Behavior");
+      setElementText('label-optimize-wallpaper', dict.optimize_wallpaper || "Optimize Wallpaper (Sleep Mode)");
 
       currentSettings.lang = code;
       if (!isInitializing) await saveSettings();
@@ -337,10 +408,24 @@ onMounted(() => {
     applyLanguage(e.target.value);
   });
 
+  document.querySelectorAll('.ui-scale-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const scale = btn.getAttribute('data-scale');
+      applyUIScale(scale);
+    });
+  });
+
   const closeOnLaunchCheck = document.getElementById('close-on-launch-check');
   closeOnLaunchCheck.addEventListener('change', (e) => {
     currentSettings.closeOnLaunch = e.target.checked;
-    saveSettings();
+    if (!isInitializing) saveSettings();
+  });
+
+  const optimizeWallpaperCheck = document.getElementById('optimize-wallpaper-check');
+  optimizeWallpaperCheck.addEventListener('change', (e) => {
+    currentSettings.optimizeWallpaper = e.target.checked;
+    if (!isInitializing) saveSettings();
+    if (!e.target.checked) handleWake(); // Force wake if disabled
   });
 
   applyTheme(currentSettings.theme || 'dark');
@@ -457,7 +542,12 @@ onMounted(() => {
     // Set UI with final settings
     await applyTheme(currentSettings.theme || "dark", false);
     await applyAccentColor(currentSettings.accent || "#0084cc", currentSettings.accentRgb || "0, 132, 204", false);
+    await applyUIScale(currentSettings.uiScale || "1.0", false);
     await applyLanguage(currentSettings.lang || "en-EN");
+    
+    closeOnLaunchCheck.checked = currentSettings.closeOnLaunch || false;
+    optimizeWallpaperCheck.checked = currentSettings.optimizeWallpaper !== undefined ? currentSettings.optimizeWallpaper : true;
+
     renderFolders();
     
     // END initialization
@@ -474,9 +564,17 @@ onMounted(() => {
     syncState();
   }
 
-  function selectPresetContext(folder, presetId) {
+  async function selectPresetContext(folder, presetId) {
     activePresetId = presetId;
     renderFolders();
+    
+    if (activePresetId) {
+      const preset = folder.presets.find(p => p.id === activePresetId);
+      if (preset) {
+        await syncDiskToPreset(folder, preset);
+      }
+    }
+    
     refreshMods();
   }
 
@@ -537,9 +635,12 @@ onMounted(() => {
     try {
       const modsOnDisk = await window.backend.getMods(folder.path);
       for (const m of modsOnDisk) {
-        const targetStatus = (preset.mods[m.id] === true);
-        if (m.enabled !== targetStatus) {
-          await window.backend.toggleMod(folder.path, m.id, targetStatus, m.file);
+        // Only override if the preset explicitly has a record for this mod
+        if (preset.mods[m.id] !== undefined) {
+          const targetStatus = (preset.mods[m.id] === true);
+          if (m.enabled !== targetStatus) {
+            await window.backend.toggleMod(folder.path, m.id, targetStatus, m.file);
+          }
         }
       }
     } catch (err) {
@@ -694,7 +795,7 @@ onMounted(() => {
 
     modsToRender.forEach(mod => {
       try {
-        const isEnabled = preset ? (preset.mods[mod.id] === true) : mod.enabled;
+        const isEnabled = preset ? (preset.mods[mod.id] !== undefined ? preset.mods[mod.id] : mod.enabled) : mod.enabled;
         const isChecked = isEnabled ? 'checked' : '';
 
         const card = document.createElement('div');
@@ -732,6 +833,46 @@ onMounted(() => {
             </label>
           </div>
         `;
+
+        // Action Bindings
+        const deleteBtn = card.querySelector('.mod-delete-btn');
+        deleteBtn.onclick = async () => {
+          if (await window.customConfirm(currentDict.delete_mod_confirm || `Are you sure you want to delete "${mod.name}" mod file permanently?`)) {
+            const res = await window.backend.deleteMod(folder.path, mod.file);
+            if (res.success) refreshMods();
+            else alert("Error deleting mod: " + res.error);
+          }
+        };
+
+        const checkbox = card.querySelector('input[type="checkbox"]');
+        checkbox.onchange = async (e) => {
+          const enabled = e.target.checked;
+          const modId = e.target.getAttribute('data-id');
+          
+          if (!enabled) {
+            const dependents = currentMods.filter(m => {
+              const mEnabled = preset ? (preset.mods[m.id] !== undefined ? preset.mods[m.id] : m.enabled) : m.enabled;
+              if (!mEnabled || !m.dependencies) return false;
+              return m.dependencies.some(d => String(d).toLowerCase() === modId.toLowerCase());
+            });
+
+            if (dependents.length > 0) {
+              e.preventDefault();
+              e.target.checked = true;
+              showDependencyWarning(mod, dependents);
+              return;
+            }
+          }
+          performToggle(modId, enabled, card);
+        };
+
+        const infoBtn = card.querySelector('.mod-info-btn');
+        infoBtn.onclick = () => {
+          document.getElementById('desc-modal-title').textContent = mod.name;
+          document.getElementById('desc-modal-body').textContent = mod.description || 'No description provided.';
+          document.getElementById('desc-modal').classList.add('active');
+        };
+
         modsListEl.appendChild(card);
       } catch (err) {
         console.error("Error rendering mod card:", err);
@@ -739,7 +880,6 @@ onMounted(() => {
     });
 
     updateModStats(mods);
-    rebindModEvents();
   }
 
   function updateModStats(modsList) {
@@ -768,48 +908,6 @@ onMounted(() => {
     `;
   }
 
-  function rebindModEvents() {
-    const selected = folders.find(f => f.id === currentSelectionId);
-    if (!selected) return;
-
-    document.querySelectorAll('.mod-card').forEach((card, index) => {
-      const mod = currentMods[index];
-      if (!mod) return;
-
-      const deleteBtn = card.querySelector('.mod-delete-btn');
-      deleteBtn.onclick = async () => {
-        if (await window.customConfirm(currentDict.delete_mod_confirm || `Are you sure you want to delete "${mod.name}" mod file permanently?`)) {
-          const res = await window.backend.deleteMod(selected.path, mod.file);
-          if (res.success) refreshMods();
-          else alert("Error deleting mod: " + res.error);
-        }
-      };
-
-      const checkbox = card.querySelector('input[type="checkbox"]');
-      checkbox.onchange = async (e) => {
-        const enabled = e.target.checked;
-        const modId = e.target.getAttribute('data-id');
-        const folder = folders.find(f => f.id === currentSelectionId);
-        let preset = (folder && activePresetId) ? folder.presets.find(p => p.id === activePresetId) : null;
-
-        if (!enabled) {
-          const dependents = currentMods.filter(m => {
-            const mEnabled = preset ? (preset.mods[m.id] === true) : m.enabled;
-            if (!mEnabled || !m.dependencies) return false;
-            return m.dependencies.some(d => String(d).toLowerCase() === modId.toLowerCase());
-          });
-
-          if (dependents.length > 0) {
-            e.preventDefault();
-            e.target.checked = true;
-            showDependencyWarning(mod, dependents);
-            return;
-          }
-        }
-        performToggle(modId, enabled, card);
-      };
-    });
-  }
 
   document.addEventListener('click', async (e) => {
     const installBtn = e.target.closest('#install-mod-btn');
@@ -855,6 +953,19 @@ onMounted(() => {
 
     if (res.success) {
       installPreviewModal.classList.remove('active');
+      
+      // If we are in a preset, automatically enable this new mod in the preset data
+      if (activePresetId) {
+        const info = await window.backend.getSingleModInfo(pendingInstallPath);
+        if (info && info.id) {
+          const preset = selected.presets.find(p => p.id === activePresetId);
+          if (preset) {
+            preset.mods[info.id] = true;
+            saveFolders();
+          }
+        }
+      }
+
       pendingInstallPath = null;
       refreshMods();
     } else {
@@ -876,21 +987,21 @@ onMounted(() => {
       if (preset) {
         preset.mods[modId] = enabled;
         saveFolders();
+        
+        // Sync to disk instantly for a more reliable experience
+        const localMod = currentMods.find(m => m.id === modId);
+        await window.backend.toggleMod(selected.path, modId, enabled, localMod?.file);
+        
         renderMods(currentMods);
       }
     } else {
-      
       const localMod = currentMods.find(m => m.id === modId);
       if (localMod) {
         localMod.enabled = enabled;
         updateModStats(currentMods);
       }
 
-      const result = await window.backend.toggleMod(selected.path, modId, enabled, localMod?.file);
-      if (!result.success) {
-        alert("Failed to toggle mod: " + result.error);
-        refreshMods();
-      }
+      await window.backend.toggleMod(selected.path, modId, enabled, localMod?.file);
     }
   }
 
@@ -1285,6 +1396,47 @@ onMounted(() => {
   });
 
   initApp();
+
+  // Deep Sleep: Unload video completely to free RAM
+  const handleSleep = () => {
+    const video = document.querySelector('.theme-bg-video');
+    if (video) {
+        savedTime = video.currentTime;
+        const liveThemes = ['black-hole', 'nullscapes', 'kocmoc', 'heliopolis'];
+        activeLiveTheme = liveThemes.find(t => document.body.classList.contains(t));
+        
+        video.pause();
+        video.src = "";
+        video.load();
+        video.remove();
+    }
+  };
+
+  const handleWake = () => {
+    if (activeLiveTheme && !document.querySelector('.theme-bg-video')) {
+      updateLiveWallpaper(activeLiveTheme);
+      const newVid = document.querySelector('.theme-bg-video');
+      if (newVid) {
+        newVid.onloadedmetadata = () => {
+          newVid.currentTime = savedTime;
+          newVid.play().catch(e => console.error("Resume Error:", e));
+        };
+      }
+    }
+  };
+
+  window.addEventListener('blur', () => {
+    if (activeLiveTheme && currentSettings.optimizeWallpaper) handleSleep();
+  });
+  window.addEventListener('focus', () => {
+    if (currentSettings.optimizeWallpaper) handleWake();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (currentSettings.optimizeWallpaper) {
+      if (document.hidden) handleSleep();
+      else handleWake();
+    }
+  });
 });
 
 </script>
@@ -1317,18 +1469,8 @@ onMounted(() => {
     </button>
   </div>
 
-  <div id="theme-bg-container">
-    <video id="black-hole-video" class="theme-bg-video black-hole-bg" muted loop playsinline>
-      <source src="/bhppr.mp4" type="video/mp4">
-    </video>
-    <video id="nullscapes-video" class="theme-bg-video nullscapes-bg" muted loop playsinline>
-      <source src="/nullscapes.webm" type="video/webm">
-    </video>
-    <video id="kocmoc-video" class="theme-bg-video kocmoc-bg" muted loop playsinline>
-      <source src="/kocmoc.mp4" type="video/mp4">
-    </video>
-  </div>
-
+  <div id="theme-bg-container"></div>
+  
   <div class="app-container">
     <Sidebar 
       @addFolder="handleAction('addFolder')" 
@@ -1354,28 +1496,18 @@ onMounted(() => {
           <div class="settings-dashboard">
             <div class="settings-tab-content active" id="tab-general">
               <div class="settings-card">
-                  <div style="display: flex; align-items: flex-end; gap: 10px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                  <div style="display: flex; align-items: flex-end; gap: 10px; margin-bottom: 5px; padding-bottom: 20px;">
                     <div style="flex: 1;">
                       <label id="label-lang">Language</label>
                       <select class="settings-select" id="lang-select">
                         <option value="en-EN">English</option>
                         <option value="ru-RU">Russian (Русский)</option>
                         <option value="ar-EG">Arabic (العربية)</option>
+                        <option value="es-419">Spanish LATAM (Español)</option>
+                        <option value="th-TH">Thai (ภาษาไทย)</option>
                       </select>
                     </div>
                     <button id="credits-btn" class="btn-secondary" style="height: 38px; padding: 0 24px; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center;"></button>
-                  </div>
-
-                  <div class="mod-card" style="margin-top: 10px;">
-                    <div class="mod-info-box">
-                      <span id="label-close-on-launch" class="mod-name" style="font-weight: 500;">Close Launcher on Game Start</span>
-                    </div>
-                    <div class="mod-actions-box">
-                      <label class="switch">
-                        <input type="checkbox" id="close-on-launch-check">
-                        <span class="slider"></span>
-                      </label>
-                    </div>
                   </div>
               </div>
             </div>
@@ -1400,6 +1532,7 @@ onMounted(() => {
                       </svg>
                       <span>Kocmoc</span>
                     </div>
+                    <div class="theme-card" id="theme-heliopolis-btn" data-theme="heliopolis">Heliopolis</div>
                   </div>
                 </div>
 
@@ -1418,6 +1551,43 @@ onMounted(() => {
                       id="accent-gray-btn" style="background: #808080; display: none;"></div>
                     <div class="accent-color-btn" data-color="#ed4245" data-rgb="237, 66, 69"
                       style="background: #ed4245;"></div>
+                  </div>
+                </div>
+
+                <div class="setting-item" style="margin-top: 30px; padding-top: 25px; border-top: 1px solid rgba(255,255,255,0.05);">
+                  <label id="label-launcher-behavior" style="margin-bottom: 15px; display: block; color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">Launcher Behavior</label>
+                  
+                  <div class="mod-card" style="margin-top: 10px; background: rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.03); padding: 12px 16px;">
+                    <div class="mod-info-box">
+                      <span id="label-close-on-launch" class="mod-name" style="font-weight: 500; font-size: 13px;">Close Launcher on Game Start</span>
+                    </div>
+                    <div class="mod-actions-box" style="margin-left: auto;">
+                      <label class="switch">
+                        <input type="checkbox" id="close-on-launch-check">
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="mod-card" style="margin-top: 12px; background: rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.03); padding: 12px 16px;">
+                    <div class="mod-info-box">
+                      <span id="label-optimize-wallpaper" class="mod-name" style="font-weight: 500; font-size: 13px;">Optimize Wallpaper (Sleep Mode)</span>
+                    </div>
+                    <div class="mod-actions-box" style="margin-left: auto;">
+                      <label class="switch">
+                        <input type="checkbox" id="optimize-wallpaper-check">
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="setting-item" style="margin-top: 25px;">
+                  <label id="label-ui-scale">UI Mode (Scaling)</label>
+                  <div class="theme-choices" style="margin-top: 10px;">
+                    <div class="theme-card ui-scale-btn" data-scale="0.85">Small</div>
+                    <div class="theme-card ui-scale-btn" data-scale="1.0">Medium</div>
+                    <div class="theme-card ui-scale-btn" data-scale="1.15">Large</div>
                   </div>
                 </div>
               </div>
@@ -1715,6 +1885,17 @@ onMounted(() => {
             <div style="display: flex; justify-content: space-between;">
               <span>Arabic</span>
               <a href="https://github.com/slyxlz" class="external-link" style="color: var(--accent); text-decoration: none; font-size: 12px;">@slyxlz</a>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Spanish (LATAM)</span>
+              <a href="https://discord.com/users/w.thm" class="external-link" style="color: var(--accent); text-decoration: none; font-size: 12px;">@w.thm</a>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>Thai</span>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="color: #0084cc; font-weight: 600; font-size: 14px;">Void</span>
+                <a href="https://www.tiktok.com/@lxvesxcker" class="external-link" style="color: var(--accent); text-decoration: none; font-size: 11px;">@lxvesxcker (TikTok)</a>
+              </div>
             </div>
           </div>
         </div>

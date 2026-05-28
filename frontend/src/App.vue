@@ -1890,12 +1890,9 @@ onMounted(() => {
               <span>Spanish (LATAM)</span>
               <a href="https://discord.com/users/w.thm" class="external-link" style="color: var(--accent); text-decoration: none; font-size: 12px;">@w.thm</a>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; justify-content: space-between;">
               <span>Thai</span>
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <span style="color: #0084cc; font-weight: 600; font-size: 14px;">Void</span>
-                <a href="https://www.tiktok.com/@lxvesxcker" class="external-link" style="color: var(--accent); text-decoration: none; font-size: 11px;">@lxvesxcker (TikTok)</a>
-              </div>
+              <a href="https://www.tiktok.com/@lxvesxcker" class="external-link" style="color: var(--accent); text-decoration: none; font-size: 12px;">@lxvesxcker</a>
             </div>
           </div>
         </div>

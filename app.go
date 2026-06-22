@@ -3,41 +3,47 @@ package main
 import (
 	"archive/zip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
-	"regexp"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.org/x/sys/windows"
-	"encoding/base64"
 )
 
+// App struct
 type App struct {
 	ctx context.Context
 }
 
-func NewApp() *App { return &App{} }
-
-type LaunchResult struct {
-	Success bool   `json:"success"`
-	Error   string `json:"error"`
+// NewApp creates a new App application struct
+func NewApp() *App {
+	return &App{}
 }
 
+// startup is called when the app starts
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.ensureDesktopShortcut()
+}
 
+// ensureDesktopShortcut creates a shortcut if it doesn't exist
+func (a *App) ensureDesktopShortcut() {
 	go func() {
 		exePath, err := os.Executable()
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 		
 		desktopPath := filepath.Join(os.Getenv("USERPROFILE"), "Desktop", "GD Organizer.lnk")
 		
@@ -45,11 +51,12 @@ func (a *App) startup(ctx context.Context) {
 			psScript := fmt.Sprintf(`$s=(New-Object -COM WScript.Shell).CreateShortcut('%s'); $s.TargetPath='%s'; $s.IconLocation='%s, 0'; $s.Save()`, desktopPath, exePath, exePath)
 			cmd := exec.Command("powershell", "-NoProfile", "-Command", psScript)
 			cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-			cmd.Run()
+			_ = cmd.Run()
 		}
 	}()
 }
 
+// Data Utility
 func (a *App) getSavePath(filename string) string {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
@@ -57,21 +64,14 @@ func (a *App) getSavePath(filename string) string {
 	}
 	dir := filepath.Join(configDir, "GD-Organizer")
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err := os.MkdirAll(dir, 0755)
-		if err != nil {
-			fmt.Println("Error creating config dir:", err)
-		}
+		_ = os.MkdirAll(dir, 0755)
 	}
 	return filepath.Join(dir, filename)
 }
 
 func (a *App) SaveData(filename string, content string) error {
 	path := a.getSavePath(filename)
-	err := os.WriteFile(path, []byte(content), 0644)
-	if err != nil {
-		fmt.Printf("Error saving %s: %v\n", filename, err)
-	}
-	return err
+	return os.WriteFile(path, []byte(content), 0644)
 }
 
 func (a *App) LoadData(filename string) string {
@@ -83,21 +83,150 @@ func (a *App) LoadData(filename string) string {
 	return string(data)
 }
 
+// Mod Models
+type ModInfo struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Enabled      bool     `json:"enabled"`
+	Version      string   `json:"version"`
+	Description  string   `json:"description"`
+	File         string   `json:"file"`
+	Dependencies []string `json:"dependencies"`
+	Icon         string   `json:"icon"`
+}
+
 type GameAnalysis struct {
 	HasGeode   bool   `json:"hasGeode"`
 	Version    string `json:"version"`
 	IsGDPS     bool   `json:"isGDPS"`
 	ExeName    string `json:"exeName"`
-	CustomLogo string `json:"customLogo"` // Base64 or local identifier
+	CustomLogo string `json:"customLogo"`
+}
+
+type LaunchResult struct {
+	Success bool   `json:"success"`
+	Error   string `json:"error"`
+}
+
+// Game Analysis Logic
+func (a *App) AnalyzeGame(folderPath string) GameAnalysis {
+	exeName, isGDPS, found := a.findGDExecutable(folderPath)
+	if !found {
+		return GameAnalysis{HasGeode: false, Version: "Not Found"}
+	}
+
+	exePath := filepath.Join(folderPath, exeName)
+	hasGeode := a.checkGeodeExistence(folderPath)
+	version := a.detectGDVersion(exePath, folderPath, hasGeode, isGDPS)
+
+	customLogo := ""
+	if isGDPS {
+		customLogo = a.fetchGDPSLogo(exePath)
+	}
+
+	return GameAnalysis{
+		HasGeode:   hasGeode,
+		Version:    version,
+		IsGDPS:     isGDPS,
+		ExeName:    exeName,
+		CustomLogo: customLogo,
+	}
+}
+
+func (a *App) findGDExecutable(folderPath string) (name string, isGDPS bool, found bool) {
+	// 1. Check Standard Name
+	stdExe := "GeometryDash.exe"
+	if _, err := os.Stat(filepath.Join(folderPath, stdExe)); err == nil {
+		return stdExe, false, true
+	}
+
+	// 2. Scan for fallbacks
+	files, err := os.ReadDir(folderPath)
+	if err != nil {
+		return "", false, false
+	}
+
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		n := f.Name()
+		low := strings.ToLower(n)
+		if strings.HasSuffix(low, ".exe") {
+			// Filter out obviously non-game EXEs
+			if low != "geodeupdater.exe" && 
+			   !strings.HasPrefix(low, "unins") && 
+			   !strings.Contains(low, "crash") &&
+			   !strings.Contains(low, "dxwebsetup") {
+				return n, true, true
+			}
+		}
+	}
+
+	// 3. Last check for core DLLs as a proxy of GD folder
+	coreDlls := []string{"libcocos2d.dll", "fmod.dll", "glew32.dll"}
+	for _, dll := range coreDlls {
+		if _, err := os.Stat(filepath.Join(folderPath, dll)); err == nil {
+			return "", false, true // Folder is GD, but EXE is missing/named weirdly
+		}
+	}
+
+	return "", false, false
+}
+
+func (a *App) checkGeodeExistence(folderPath string) bool {
+	indicators := []string{"Geode.dll", "geode-loader.dll", "XInput9_1_0.dll"}
+	for _, ind := range indicators {
+		if _, err := os.Stat(filepath.Join(folderPath, ind)); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *App) detectGDVersion(exePath string, folderPath string, hasGeode bool, isGDPS bool) string {
+	version := a.getFileVersionNative(exePath)
+	
+	// Filter launcher/installer versions
+	if version != "" && !strings.HasPrefix(version, "2.") {
+		version = ""
+	}
+
+	if version == "" && hasGeode {
+		v := a.getFileVersionNative(filepath.Join(folderPath, "Geode.dll"))
+		if strings.HasPrefix(v, "2.") {
+			version = v
+		}
+	}
+
+	if version == "" {
+		re := regexp.MustCompile(`[vV]?(2\.\d+)`)
+		match := re.FindStringSubmatch(filepath.Base(folderPath))
+		if len(match) > 1 {
+			version = strings.TrimPrefix(strings.ToLower(match[1]), "v")
+		}
+	}
+
+	if version == "" {
+		if isGDPS {
+			return "GDPS"
+		}
+		return "2.206" // Default fallback
+	}
+
+	return strings.TrimSpace(version)
 }
 
 func (a *App) getFileVersionNative(filePath string) string {
 	vSize, _ := windows.GetFileVersionInfoSize(filePath, nil)
-	if vSize <= 0 { return "" }
+	if vSize <= 0 {
+		return ""
+	}
 	vData := make([]byte, vSize)
-	if err := windows.GetFileVersionInfo(filePath, 0, vSize, unsafe.Pointer(&vData[0])); err != nil { return "" }
+	if err := windows.GetFileVersionInfo(filePath, 0, vSize, unsafe.Pointer(&vData[0])); err != nil {
+		return ""
+	}
 	
-	// Try string table
 	langs := []string{"040904b0", "040904E4", "080904b0", "000004b0"}
 	for _, lang := range langs {
 		var vStr *uint16
@@ -108,7 +237,6 @@ func (a *App) getFileVersionNative(filePath string) string {
 		}
 	}
 
-	// Fallback to fixed info
 	var fixedInfo *windows.VS_FIXEDFILEINFO
 	var fixedInfoLen uint32
 	if err := windows.VerQueryValue(unsafe.Pointer(&vData[0]), "\\", unsafe.Pointer(&fixedInfo), &fixedInfoLen); err == nil {
@@ -116,286 +244,194 @@ func (a *App) getFileVersionNative(filePath string) string {
 		v2 := (fixedInfo.FileVersionMS) & 0xFFFF
 		v3 := (fixedInfo.FileVersionLS >> 16) & 0xFFFF
 		v4 := (fixedInfo.FileVersionLS) & 0xFFFF
-		if v3 == 0 { return fmt.Sprintf("%d.%d%d", v1, v2, v4) }
+		if v3 == 0 {
+			return fmt.Sprintf("%d.%d%d", v1, v2, v4)
+		}
 		return fmt.Sprintf("%d.%d%d%d", v1, v2, v3, v4)
 	}
 	return ""
 }
 
-func (a *App) AnalyzeGame(folderPath string) GameAnalysis {
-	isValidGD := false
-	gdCoreDlls := []string{"libcocos2d.dll", "fmod.dll", "glew32.dll"}
-	for _, core := range gdCoreDlls {
-		if _, err := os.Stat(filepath.Join(folderPath, core)); err == nil {
-			isValidGD = true
-			break
-		}
-	}
-	if _, err := os.Stat(filepath.Join(folderPath, "Resources")); err == nil {
-		isValidGD = true
-	}
-	if !isValidGD { return GameAnalysis{HasGeode: false, Version: "Not Found"} }
-
-	exePath := filepath.Join(folderPath, "GeometryDash.exe")
-	isGDPS := false
-	exeName := "GeometryDash.exe"
-
-	if _, err := os.Stat(exePath); os.IsNotExist(err) {
-		files, err := os.ReadDir(folderPath)
-		if err == nil {
-			for _, f := range files {
-				name := f.Name()
-				if !f.IsDir() && strings.HasSuffix(strings.ToLower(name), ".exe") {
-					lower := strings.ToLower(name)
-					if lower != "geodeupdater.exe" && !strings.HasPrefix(lower, "unins") && !strings.Contains(lower, "crash") {
-						exeName = name
-						exePath = filepath.Join(folderPath, exeName)
-						isGDPS = true
-						break
-					}
-				}
-			}
-		}
-	}
-
-	// Deep scan for GDPS server correlation if not already flagged
-	if !isGDPS && exePath != "" {
-		if a.checkGDPSBinary(exePath) {
-			isGDPS = true
-		}
-	}
-
-	indicators := []string{"Geode.dll", "geode-loader.dll", "XInput9_1_0.dll"}
-	hasGeode := false
-	for _, ind := range indicators {
-		if _, err := os.Stat(filepath.Join(folderPath, ind)); err == nil {
-			hasGeode = true
-			break
-		}
-	}
-	
-	version := a.getFileVersionNative(exePath)
-	// If the version doesn't start with "2." it's likely a launcher version (like 5.x)
-	if version != "" && !strings.HasPrefix(version, "2.") {
-		version = ""
-	}
-
-	if version == "" && hasGeode {
-		v := a.getFileVersionNative(filepath.Join(folderPath, "Geode.dll"))
-		if strings.HasPrefix(v, "2.") { version = v }
-	}
-
-	// Last resort: Try to find a version pattern in the folder path itself
-	// Some pirated/repacked versions (like SteamUnlocked) strip EXE info but put version in folder name
-	if version == "" {
-		base := filepath.Base(folderPath)
-		// Look for patterns like v2.206, 2.2074, etc.
-		re := regexp.MustCompile(`[vV]?(2\.\d+)`)
-		match := re.FindStringSubmatch(base)
-		if len(match) > 1 {
-			version = strings.TrimPrefix(strings.ToLower(match[1]), "v")
-		}
-	}
-
-	version = strings.TrimSpace(version)
-	version = strings.ReplaceAll(version, " ", "")
-	
-	if version == "" {
-		version = "2.206" // Default fallback
-		if isGDPS { version = "GDPS" }
-	}
-
-	customLogo := ""
-	if isGDPS && exePath != "" {
-		customLogo = a.fetchGDPSLogo(exePath)
-	}
-
-	return GameAnalysis{HasGeode: hasGeode, Version: version, IsGDPS: isGDPS, ExeName: exeName, CustomLogo: customLogo}
-}
-
-func (a *App) checkGDPSBinary(exePath string) bool {
-	f, err := os.Open(exePath)
-	if err != nil { return false }
-	defer f.Close()
-
-	buffer := make([]byte, 10*1024*1024) 
-	n, _ := f.Read(buffer)
-	data := string(buffer[:n])
-
-	if strings.Contains(data, "database") {
-		official := []string{"boomlings.com", "geometrydash.com"}
-		for _, h := range official {
-			if strings.Contains(data, h) { return false }
-		}
-		return true
-	}
-	return false
-}
-
+// GDPS Helper
 func (a *App) fetchGDPSLogo(exePath string) string {
-	f, err := os.Open(exePath)
-	if err != nil { return "" }
-	defer f.Close()
+	data, err := os.ReadFile(exePath)
+	if err != nil {
+		// Try partial read if file is huge
+		f, err := os.Open(exePath)
+		if err != nil { return "" }
+		defer f.Close()
+		buf := make([]byte, 5*1024*1024)
+		n, _ := f.Read(buf)
+		data = buf[:n]
+	}
 
-	buffer := make([]byte, 10*1024*1024)
-	n, _ := f.Read(buffer)
-	data := string(buffer[:n])
-
-	// Regex to find potential server URLs
-	// We look for http://something/database and take the base
 	re := regexp.MustCompile(`(https?://[a-zA-Z0-9\-\.]+(?::\d+)?)/[a-zA-Z0-9\-\.\_/]*database`)
-	matches := re.FindStringSubmatch(data)
-	if len(matches) < 2 { return "" }
+	matches := re.FindStringSubmatch(string(data))
+	if len(matches) < 2 {
+		return ""
+	}
 	
 	baseURL := matches[1]
-	// Possible logo paths
-	logoPaths := []string{"/logo.png", "/icon.png", "/icon.ico", "/favicon.ico"}
+	client := &http.Client{Timeout: 3 * time.Second}
+	paths := []string{"/logo.png", "/icon.png", "/favicon.ico"}
 	
-	client := &http.Client{
-		Timeout: 5 * 1024 * 1024, // 5ms? no, Timeout is Duration
-	}
-	client.Timeout = 5 * 1000 * 1000 * 1000 // 5 seconds
-
-	for _, p := range logoPaths {
+	for _, p := range paths {
 		resp, err := client.Get(baseURL + p)
 		if err == nil && resp.StatusCode == 200 {
 			defer resp.Body.Close()
-			imgData, err := ioutil.ReadAll(resp.Body)
-			if err == nil && len(imgData) > 0 {
-				// We don't want to store huge files in JSON
-				if len(imgData) < 1024*1024 { // Max 1MB
-					mime := "image/png"
-					if strings.HasSuffix(p, ".ico") { mime = "image/x-icon" }
-					encoded := base64.StdEncoding.EncodeToString(imgData)
-					return "data:" + mime + ";base64," + encoded
-				}
+			img, _ := io.ReadAll(resp.Body)
+			if len(img) > 0 && len(img) < 512*1024 {
+				mime := "image/png"
+				if strings.HasSuffix(p, ".ico") { mime = "image/x-icon" }
+				return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(img)
 			}
 		}
 	}
 	return ""
 }
 
+// Mod Management
 func (a *App) GetMods(folderPath string) []ModInfo {
 	modsPath := filepath.Join(folderPath, "geode", "mods")
-	files, err := ioutil.ReadDir(modsPath)
-	if err != nil { return []ModInfo{} }
+	files, err := os.ReadDir(modsPath)
+	if err != nil {
+		return []ModInfo{}
+	}
 
 	var results []ModInfo
 	for _, f := range files {
-		name := f.Name()
-		if strings.HasSuffix(name, ".geode") || strings.HasSuffix(name, ".disabled") {
-			id := strings.TrimSuffix(strings.TrimSuffix(name, ".disabled"), ".geode")
-			info := a.extractModInfoNative(filepath.Join(modsPath, name))
-			
-			displayName := id
-			version := "1.0.0"
-			description := ""
-			var deps []string
+		n := f.Name()
+		if !strings.HasSuffix(n, ".geode") && !strings.HasSuffix(n, ".disabled") {
+			continue
+		}
 
-			if info != nil {
-				if internalID, ok := info["id"].(string); ok { id = internalID }
-				if n, ok := info["name"].(string); ok { displayName = n } else if n, ok := info["n"].(string); ok { displayName = n }
-				if v, ok := info["version"].(string); ok { version = v } else if v, ok := info["v"].(string); ok { version = v }
-				if d, ok := info["description"].(string); ok { description = d } else if d, ok := info["d"].(string); ok { description = d }
-				
-				if dependencies, ok := info["dependencies"]; ok {
-					switch d := dependencies.(type) {
-					case []interface{}:
-						for _, dep := range d {
-							if dID, ok := dep.(string); ok {
-								deps = append(deps, dID)
-							} else if dMap, ok := dep.(map[string]interface{}); ok {
-								if dID, ok := dMap["id"].(string); ok {
-									deps = append(deps, dID)
-								}
-							}
-						}
-					case map[string]interface{}:
-						for k := range d {
-							deps = append(deps, k)
+		fullPath := filepath.Join(modsPath, n)
+		id := strings.TrimSuffix(strings.TrimSuffix(n, ".disabled"), ".geode")
+		
+		info, icon := a.extractModResources(fullPath)
+		
+		// Defaults
+		displayName := id
+		version := "1.0.0"
+		description := ""
+		var deps []string
+
+		if info != nil {
+			if s, ok := info["id"].(string); ok { id = s }
+			if s, ok := info["name"].(string); ok { displayName = s } else if s, ok := info["n"].(string); ok { displayName = s }
+			if s, ok := info["version"].(string); ok { version = s } else if s, ok := info["v"].(string); ok { version = s }
+			if s, ok := info["description"].(string); ok { description = s } else if s, ok := info["d"].(string); ok { description = s }
+			
+			if d, ok := info["dependencies"]; ok {
+				switch v := d.(type) {
+				case []interface{}:
+					for _, item := range v {
+						if sid, ok := item.(string); ok { deps = append(deps, sid) }
+						if m, ok := item.(map[string]interface{}); ok {
+							if sid, ok := m["id"].(string); ok { deps = append(deps, sid) }
 						}
 					}
+				case map[string]interface{}:
+					for k := range v { deps = append(deps, k) }
 				}
 			}
-
-			results = append(results, ModInfo{
-				ID: id, Name: displayName, Enabled: !strings.HasSuffix(name, ".disabled"), File: name, Version: version, Description: description, Dependencies: deps,
-			})
 		}
+
+		results = append(results, ModInfo{
+			ID: id, Name: displayName, Enabled: !strings.HasSuffix(n, ".disabled"),
+			File: n, Version: version, Description: description,
+			Dependencies: deps, Icon: icon,
+		})
 	}
 	return results
 }
 
-func (a *App) extractModInfoNative(zipPath string) map[string]interface{} {
+func (a *App) extractModResources(zipPath string) (info map[string]interface{}, icon string) {
 	r, err := zip.OpenReader(zipPath)
-	if err != nil { return nil }
+	if err != nil { return nil, "" }
 	defer r.Close()
+
 	for _, f := range r.File {
 		if f.Name == "mod.json" {
 			rc, err := f.Open()
-			if err != nil { return nil }
-			defer rc.Close()
-			var data map[string]interface{}
-			json.NewDecoder(rc).Decode(&data)
-			return data
+			if err == nil {
+				_ = json.NewDecoder(rc).Decode(&info)
+				rc.Close()
+			}
+		}
+		if icon == "" && (f.Name == "logo.png" || f.Name == "icon.png") {
+			rc, err := f.Open()
+			if err == nil {
+				data, _ := io.ReadAll(rc)
+				if len(data) > 0 {
+					icon = "data:image/png;base64," + base64.StdEncoding.EncodeToString(data)
+				}
+				rc.Close()
+			}
 		}
 	}
-	return nil
+	return
 }
 
 func (a *App) ToggleMod(folderPath string, modID string, enabled bool, fileName string) map[string]interface{} {
 	modsPath := filepath.Join(folderPath, "geode", "mods")
 	oldPath := filepath.Join(modsPath, fileName)
-	newName := strings.TrimSuffix(strings.TrimSuffix(fileName, ".disabled"), ".geode")
-	if !enabled { newName += ".geode.disabled" } else { newName += ".geode" }
-	os.Rename(oldPath, filepath.Join(modsPath, newName))
+	
+	base := strings.TrimSuffix(strings.TrimSuffix(fileName, ".disabled"), ".geode")
+	newName := base + ".geode"
+	if !enabled {
+		newName += ".disabled"
+	}
+	
+	_ = os.Rename(oldPath, filepath.Join(modsPath, newName))
+	return map[string]interface{}{"success": true}
+}
+
+func (a *App) BulkToggleMods(folderPath string, operations []map[string]interface{}) map[string]interface{} {
+	modsPath := filepath.Join(folderPath, "geode", "mods")
+	for _, op := range operations {
+		fileName, _ := op["file"].(string)
+		enabled, _ := op["enabled"].(bool)
+		
+		oldPath := filepath.Join(modsPath, fileName)
+		base := strings.TrimSuffix(strings.TrimSuffix(fileName, ".disabled"), ".geode")
+		newName := base + ".geode"
+		if !enabled {
+			newName += ".disabled"
+		}
+		
+		_ = os.Rename(oldPath, filepath.Join(modsPath, newName))
+	}
 	return map[string]interface{}{"success": true}
 }
 
 func (a *App) LaunchGame(folderPath string, exeName string) LaunchResult {
-	exePath := ""
+	finalExe := ""
 	if exeName != "" {
-		exePath = filepath.Join(folderPath, exeName)
-		if _, err := os.Stat(exePath); os.IsNotExist(err) {
-			exePath = "" // Known name is missing, fallback to search
+		p := filepath.Join(folderPath, exeName)
+		if _, err := os.Stat(p); err == nil {
+			finalExe = p
 		}
 	}
 
-	if exePath == "" {
-		exePath = filepath.Join(folderPath, "GeometryDash.exe")
-		if _, err := os.Stat(exePath); os.IsNotExist(err) {
-			files, err := os.ReadDir(folderPath)
-			if err != nil {
-				return LaunchResult{Success: false, Error: "Could not read directory"}
-			}
-			found := false
-			for _, f := range files {
-				name := f.Name()
-				if !f.IsDir() && strings.HasSuffix(strings.ToLower(name), ".exe") {
-					lower := strings.ToLower(name)
-					if lower != "geodeupdater.exe" && !strings.HasPrefix(lower, "unins") && !strings.Contains(lower, "crash") {
-						exePath = filepath.Join(folderPath, name)
-						found = true
-						break
-					}
-				}
-			}
-			if !found {
-				return LaunchResult{Success: false, Error: "Game executable not found"}
-			}
+	if finalExe == "" {
+		name, _, found := a.findGDExecutable(folderPath)
+		if !found {
+			return LaunchResult{Success: false, Error: "Executable not found"}
 		}
+		finalExe = filepath.Join(folderPath, name)
 	}
 
-	cmd := exec.Command(exePath)
+	cmd := exec.Command(finalExe)
 	cmd.Dir = folderPath
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	err := cmd.Start()
-	if err != nil {
+	if err := cmd.Start(); err != nil {
 		return LaunchResult{Success: false, Error: err.Error()}
 	}
 	return LaunchResult{Success: true}
 }
 
+// Wails Bindings
 func (a *App) OpenFolder() string {
 	res, _ := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: "Select GD Folder"})
 	return res
@@ -407,25 +443,24 @@ func (a *App) OpenFile(filters []runtime.FileFilter) string {
 }
 
 func (a *App) DeleteMod(folderPath string, fileName string) map[string]interface{} {
-	os.Remove(filepath.Join(folderPath, "geode", "mods", fileName))
-	return map[string]interface{}{"success": true}
+	err := os.Remove(filepath.Join(folderPath, "geode", "mods", fileName))
+	return map[string]interface{}{"success": err == nil, "error": fmt.Sprint(err)}
 }
 
 func (a *App) InstallMod(targetPath string, sourcePath string) map[string]interface{} {
 	dest := filepath.Join(targetPath, "geode", "mods", filepath.Base(sourcePath))
-	out, _ := os.Create(dest); defer out.Close()
 	in, _ := os.Open(sourcePath); defer in.Close()
-	io.Copy(out, in)
-	return map[string]interface{}{"success": true}
+	out, _ := os.Create(dest); defer out.Close()
+	_, err := io.Copy(out, in)
+	return map[string]interface{}{"success": err == nil}
 }
 
-func (a *App) GetSingleModInfo(path string) map[string]interface{} { return a.extractModInfoNative(path) }
-
 func (a *App) FetchModInfo(id string) map[string]interface{} {
-	resp, _ := http.Get("https://api.geode-sdk.org/v1/mods/" + id)
-	if resp == nil { return nil }; defer resp.Body.Close()
+	resp, err := http.Get("https://api.geode-sdk.org/v1/mods/" + id)
+	if err != nil || resp == nil { return nil }
+	defer resp.Body.Close()
 	var res map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&res)
+	_ = json.NewDecoder(resp.Body).Decode(&res)
 	return res
 }
 
@@ -433,50 +468,44 @@ func (a *App) BrowseCatalog(page int, query string, gdVersion string) map[string
 	if gdVersion == "" { gdVersion = "2.206" }
 	url := fmt.Sprintf("https://api.geode-sdk.org/v1/mods?page=%d&per_page=15&status=accepted&platforms=win&gd=%s", page, gdVersion)
 	if query != "" { url += "&query=" + query }
+	
 	resp, err := http.Get(url)
 	if err != nil || resp == nil { return map[string]interface{}{"total": 0, "mods": []interface{}{}} }
 	defer resp.Body.Close()
 	
-	body, _ := ioutil.ReadAll(resp.Body)
 	var raw map[string]interface{}
-	json.Unmarshal(body, &raw)
+	_ = json.NewDecoder(resp.Body).Decode(&raw)
 	
 	total := 0
 	var finalMods []map[string]interface{}
 
 	if payload, ok := raw["payload"].(map[string]interface{}); ok {
 		if c, ok := payload["count"].(float64); ok { total = int(c) }
-		
 		if data, ok := payload["data"].([]interface{}); ok {
-			for _, mRaw := range data {
-				m, ok := mRaw.(map[string]interface{})
-				if !ok { continue }
+			for _, item := range data {
+				m, _ := item.(map[string]interface{})
+				if m == nil { continue }
 
 				id, _ := m["id"].(string)
 				downloads, _ := m["download_count"].(float64)
 				featured, _ := m["featured"].(bool)
 				
-				name := id
-				desc := ""
-				version := "?"
-				downloadLink := ""
-				developer := "Unknown"
+				name, desc, version, dlLink, devName := id, "", "?", "", "Unknown"
 
 				if versions, ok := m["versions"].([]interface{}); ok && len(versions) > 0 {
 					if v0, ok := versions[0].(map[string]interface{}); ok {
-						if n, ok := v0["name"].(string); ok { name = n }
-						if d, ok := v0["description"].(string); ok { desc = d }
-						if ver, ok := v0["version"].(string); ok { version = ver }
-						if dl, ok := v0["download_link"].(string); ok { downloadLink = dl }
+						if s, ok := v0["name"].(string); ok { name = s }
+						if s, ok := v0["description"].(string); ok { desc = s }
+						if s, ok := v0["version"].(string); ok { version = s }
+						if s, ok := v0["download_link"].(string); ok { dlLink = s }
 					}
 				}
 
 				if devs, ok := m["developers"].([]interface{}); ok {
-					for _, devRaw := range devs {
-						if dev, ok := devRaw.(map[string]interface{}); ok {
-							isOwner, _ := dev["is_owner"].(bool)
-							if isOwner {
-								if dName, ok := dev["display_name"].(string); ok { developer = dName }
+					for _, dItem := range devs {
+						if d, ok := dItem.(map[string]interface{}); ok {
+							if owner, _ := d["is_owner"].(bool); owner {
+								if s, ok := d["display_name"].(string); ok { devName = s }
 								break
 							}
 						}
@@ -484,38 +513,58 @@ func (a *App) BrowseCatalog(page int, query string, gdVersion string) map[string
 				}
 
 				finalMods = append(finalMods, map[string]interface{}{
-					"id": id,
-					"name": name,
-					"description": desc,
-					"version": version,
-					"developer": developer,
-					"downloads": downloads,
-					"download_link": downloadLink,
+					"id": id, "name": name, "description": desc, "version": version,
+					"developer": devName, "downloads": downloads, "download_link": dlLink,
 					"featured": featured,
 				})
 			}
 		}
 	}
 
-	if finalMods == nil { finalMods = []map[string]interface{}{} }
-
-	return map[string]interface{}{
-		"total": total,
-		"mods": finalMods,
-	}
+	return map[string]interface{}{ "total": total, "mods": finalMods }
 }
 
 func (a *App) DownloadCatalogMod(folderPath string, downloadURL string, modID string) map[string]interface{} {
 	dest := filepath.Join(folderPath, "geode", "mods", modID+".geode")
-	out, err := os.Create(dest); if err != nil { return map[string]interface{}{"success": false, "error": err.Error()} }; defer out.Close()
-	resp, err := http.Get(downloadURL); if err != nil { return map[string]interface{}{"success": false, "error": err.Error()} }; defer resp.Body.Close()
-	io.Copy(out, resp.Body)
+	resp, err := http.Get(downloadURL)
+	if err != nil { return map[string]interface{}{"success": false} }
+	defer resp.Body.Close()
+	
+	out, _ := os.Create(dest); defer out.Close()
+	_, err = io.Copy(out, resp.Body)
+	return map[string]interface{}{"success": err == nil}
+}
+
+func (a *App) ReadLogs(folderPath string) string {
+	path := filepath.Join(folderPath, "geode", "logs", "latest.log")
+	data, err := os.ReadFile(path)
+	if err != nil { return "Log file not found." }
+	return string(data)
+}
+
+func (a *App) UpdateMod(folderPath string, id string, downloadURL string) map[string]interface{} {
+	dest := filepath.Join(folderPath, "geode", "mods", id+".geode")
+	temp := dest + ".tmp"
+
+	resp, err := http.Get(downloadURL)
+	if err != nil { return map[string]interface{}{"success": false} }
+	defer resp.Body.Close()
+
+	out, _ := os.Create(temp); defer out.Close()
+	_, _ = io.Copy(out, resp.Body)
+	out.Close()
+
+	_ = os.Remove(dest)
+	_ = os.Remove(dest + ".disabled")
+	_ = os.Rename(temp, dest)
+
 	return map[string]interface{}{"success": true}
 }
 
-func (a *App) CloseWindow() { runtime.Quit(a.ctx) }
-func (a *App) MinimizeWindow() { runtime.WindowMinimise(a.ctx) }
+func (a *App) CloseApp() { runtime.Quit(a.ctx) }
+func (a *App) MinimizeApp() { runtime.WindowMinimise(a.ctx) }
 
-type ModInfo struct {
-	ID string `json:"id"`; Name string `json:"name"`; Enabled bool `json:"enabled"`; Version string `json:"version"`; Description string `json:"description"`; File string `json:"file"`; Dependencies []string `json:"dependencies"`
+func (a *App) GetSingleModInfo(path string) map[string]interface{} {
+	info, _ := a.extractModResources(path)
+	return info
 }

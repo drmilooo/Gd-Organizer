@@ -1,5 +1,5 @@
-# GD Organizer - Changelog (v1.2.0)
-List of technical updates and optimizations made since v1.1.0.
+# GD Organizer - Changelog (v1.3.0)
+List of technical updates and optimizations made since v1.2.0.
 
 ### Core & Performance
 - **Deep Sleep System:** Implemented a smart memory management system that unloads live wallpapers from RAM when the window is blurred or minimized. This reduced idle RAM usage from ~800MB to ~100MB.

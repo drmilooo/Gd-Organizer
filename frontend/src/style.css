@@ -1,18 +1,107 @@
 :root {
-  --bg-app: #313338;
-  --bg-sidebar: #2b2d31;
-  --bg-card: rgba(255, 255, 255, 0.04);
+  --bg-app: #1e1f22;          /* Aesthetic Midnight Slate */
+  --bg-sidebar: #111214;      /* Deep contrast sidebar */
+  --bg-card: rgba(255, 255, 255, 0.03);
   --accent: #0084cc;
   --accent-rgb: 0, 132, 204;
   --accent-hover: #0073b3;
   --text-primary: #dbdee1;
   --text-secondary: #949ba4;
-  --text-dim: #6d6f78;
-  --border: rgba(255, 255, 255, 0.06);
-  --radius-lg: 8px;
-  --radius-md: 6px;
+  --text-dim: #62656e;
+  --border: rgba(255, 255, 255, 0.05);
+  --radius-lg: 12px;
+  --radius-md: 8px;
   --radius-sm: 4px;
-  --font-main: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  --font-main: 'Inter', 'Outfit', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: #0a0a0b; /* Deep dark background to hide content */
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+}
+
+.loading-progress-container {
+  width: 200px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.loading-bar {
+  height: 100%;
+  width: 10%; /* Initial width */
+  background: var(--accent);
+  box-shadow: 0 0 15px var(--accent);
+  border-radius: 10px;
+  transition: width 0.3s ease;
+}
+
+.loading-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.loading-logo-container {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-logo {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  z-index: 2;
+  filter: drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.3));
+}
+
+.loading-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 4px solid rgba(255, 255, 255, 0.05);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+#loading-text {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin: 0;
+  color: white;
+}
+
+#loading-status {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
 /* Custom Modern Scrollbars */
@@ -41,13 +130,13 @@
 }
 
 body.light {
-  --bg-app: #ffffff;
-  --bg-sidebar: #f2f3f5;
+  --bg-app: #f2f3f5;          /* Softer light gray */
+  --bg-sidebar: #e3e5e8;      /* Distinct but soft sidebar */
   --bg-card: #ffffff;
-  --text-primary: #060607;
-  --text-secondary: #2e3338;
-  --text-dim: #5c6067;
-  --border: rgba(0, 0, 0, 0.1);
+  --text-primary: #2e3338;    /* Dark gray instead of pure black */
+  --text-secondary: #4e5058;
+  --text-dim: #80848e;
+  --border: rgba(0, 0, 0, 0.08);
 }
 
 body.midnight {
@@ -62,8 +151,8 @@ body.midnight {
 
 body.black-hole {
   --bg-app: transparent;
-  --bg-sidebar: #000000;
-  --bg-card: rgba(0, 0, 0, 0.4);
+  --bg-sidebar: rgba(0, 0, 0, 0.2);
+  --bg-card: rgba(0, 0, 0, 0.2);
   --text-primary: #ffffff;
   --text-secondary: #b5bac1;
   --text-dim: #72767d;
@@ -72,18 +161,524 @@ body.black-hole {
 
 body.kocmoc, body.heliopolis {
   --bg-app: transparent;
-  --bg-sidebar: rgba(19, 19, 19, 0.45);
-  --bg-card: rgba(30, 30, 30, 0.4);
+  --bg-sidebar: rgba(10, 10, 10, 0.2);
+  --bg-card: rgba(20, 20, 20, 0.2);
   --text-primary: #ffffff;
   --text-secondary: #b5bac1;
   --text-dim: #72767d;
-  --border: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.03);
 }
 
-body.kocmoc .sidebar, body.heliopolis .sidebar {
+/* ═══════════════════════════════════════════════
+   GEOMETRY DASH THEME — Geode Mod Browser Style
+   ═══════════════════════════════════════════════ */
+
+/* --- Root Variables --- */
+body.geometry-dash {
+  --bg-app: #1a1024;
+  --bg-sidebar: #1a1024;
+  --bg-card: #2D2433;
+  --accent: #40e050;
+  --accent-rgb: 64, 224, 80;
+  --text-primary: #ffffff;
+  --text-secondary: #ffff00;
+  --text-dim: rgba(255, 255, 255, 0.55);
+  --border: rgba(0, 0, 0, 0.6);
+  --radius-md: 6px;
+  --font-main: 'Pusab', 'Segoe UI Black', 'Arial Black', sans-serif;
+}
+
+/* --- Background: GD Sunset Gradient --- */
+body.geometry-dash {
+  background: 
+    linear-gradient(180deg,
+      #f5a060 0%,
+      #e87090 25%,
+      #9060c0 50%,
+      #5050b0 75%,
+      #3040a0 100%
+    ) !important;
+  font-family: 'Pusab', 'Segoe UI Black', 'Arial Black', sans-serif !important;
+}
+
+/* --- Sidebar: Dark Icon Strip (like GD left menu) --- */
+body.geometry-dash .sidebar {
+  background: rgba(20, 10, 30, 0.85) !important;
+  border-right: 4px solid #000 !important;
+  backdrop-filter: blur(10px);
+}
+
+body.geometry-dash .sidebar-brand {
+  border-bottom: 3px solid #000;
+  padding-bottom: 12px;
+}
+
+/* Branding handled global h2/h3 rules below */
+
+body.geometry-dash .sidebar-footer {
+  background: rgba(0, 0, 0, 0.4) !important;
+  border-top: 3px solid #000 !important;
+}
+
+body.geometry-dash .settings-entry {
+  color: #ffffff !important;
+  -webkit-text-stroke: 0.5px #000;
+  text-shadow: 1px 1px 0px rgba(0,0,0,0.4);
+  font-weight: 800;
+  font-size: 14px; /* Enlarge */
+}
+
+body.geometry-dash .settings-entry:hover {
+  background: rgba(255, 255, 0, 0.1) !important;
+}
+
+body.geometry-dash .sidebar-header {
+    margin-bottom: 35px;
+}
+
+/* Logo handled global h2/h3 rules below */
+
+body.geometry-dash .add-btn {
+  background: #40e050 !important;
+  color: #000 !important;
+  border: 3px solid #000 !important;
+  border-radius: 6px !important;
+  font-weight: 900;
+  box-shadow: 0 3px 0 #1a7a22;
+}
+
+/* --- Folder/Instance Items --- */
+body.geometry-dash .folder-item {
+  border-bottom: 2px solid rgba(0, 0, 0, 0.4) !important;
+  border-radius: 0 !important;
+}
+
+body.geometry-dash .folder-item:hover {
+  background: rgba(255, 255, 0, 0.05) !important;
+}
+
+body.geometry-dash .folder-item.active {
+  background: rgba(255, 255, 0, 0.08) !important;
+  border-left: 4px solid #ffff00 !important;
+}
+
+body.geometry-dash .folder-item.active h4 {
+  color: #ffff00 !important;
+  -webkit-text-stroke: 1.0px #000;
+  paint-order: stroke fill;
+  letter-spacing: 1px;
+}
+
+body.geometry-dash .folder-item h4 {
+  font-size: 16px; /* Larger */
+  -webkit-text-stroke: 1.0px #000; /* Thinner for clarity */
+  paint-order: stroke fill;
+  letter-spacing: 1px; /* More air */
+  text-shadow: 1px 1px 0px rgba(0,0,0,0.5);
+}
+
+body.geometry-dash .folder-item p {
+  font-family: var(--font-main) !important;
+  text-transform: none !important;
+  font-size: 10px !important;
+  opacity: 0.8 !important;
+  text-shadow: none !important;
+  color: #ccc !important;
+  letter-spacing: 0.8px;
+  -webkit-text-stroke: 0px; /* Clear path */
+}
+
+
+/* --- Presets Container (Geode Sidebar Extension) --- */
+body.geometry-dash .presets-container {
+  border-top: 3px solid #000 !important;
+  background: rgba(0,0,0,0.2) !important;
+  padding: 8px !important;
+  margin-top: 10px !important;
+}
+
+body.geometry-dash .preset-item {
+  border: 3px solid #000 !important;
+  border-radius: 8px !important;
+  background: rgba(60, 40, 80, 0.4) !important;
+  margin-bottom: 5px !important;
+  padding: 6px 10px !important;
+}
+
+body.geometry-dash .preset-item span {
+  font-size: 13px !important;
+  -webkit-text-stroke: 1.0px #000;
+  paint-order: stroke fill;
+  letter-spacing: 0.8px;
+  color: white !important;
+}
+
+body.geometry-dash .preset-item.active {
+  background: rgba(255, 255, 0, 0.15) !important;
+  border-color: #ffff00 !important;
+}
+
+body.geometry-dash .preset-item.active span {
+  color: #ffff00 !important;
+}
+
+body.geometry-dash .preset-btn {
+   background: #4466cc !important;
+   border: 2px solid #000 !important;
+   border-radius: 6px !important;
+   color: white !important;
+   box-shadow: 0 2px 0 #223388 !important;
+   margin-left: 3px;
+}
+
+body.geometry-dash .add-preset-btn {
+  background: #40e050 !important;
+  border: 3px solid #000 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 3px 0 #1a7a22 !important;
+  font-size: 14px !important;
+  -webkit-text-stroke: 1.0px #000;
+  paint-order: stroke fill;
+  letter-spacing: 0.8px;
+  color: white !important;
+  margin-top: 8px !important;
+}
+
+/* --- Settings Nav Tabs (yellow tabs from screenshot) --- */
+
+body.geometry-dash .settings-nav-item.active {
+  background: #ffff00 !important;
+  color: #000 !important;
+  box-shadow: 0 3px 0 #b3a000;
+}
+
+/* --- Main Content: Geode Dark Panel --- */
+body.geometry-dash .main-content {
+  background: transparent !important;
+}
+
+body.geometry-dash .content-view {
+  background: #2D2433 !important;
+  border: 5px solid #000 !important;
+  border-radius: 8px !important;
+  margin: 20px !important;
+  padding: 20px !important;
+  box-shadow: 
+    inset 0 0 0 2px rgba(255, 255, 255, 0.05),
+    0 15px 50px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* --- Game Details Header --- */
+body.geometry-dash .game-details {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* --- Typography: GD Bold + Sharp (Pro-Standard) --- */
+body.geometry-dash {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body.geometry-dash h1 {
+  color: #ffffff !important;
+  -webkit-text-stroke: 5px #000; /* Pro value for large text */
+  paint-order: stroke fill;
+  text-shadow: 4px 4px 0px rgba(0,0,0,1);
+  font-size: 42px !important;
+  letter-spacing: 1px;
+}
+
+body.geometry-dash h2,
+body.geometry-dash h3,
+body.geometry-dash .sidebar-brand span,
+body.geometry-dash .sidebar-header .logo {
+  color: #ffffff !important;
+  -webkit-text-stroke: 2.5px #000; /* Balanced weight */
+  paint-order: stroke fill;
+  text-shadow: 3px 3px 0px rgba(0,0,0,1);
+  letter-spacing: 0.8px;
+}
+
+body.geometry-dash .mod-name {
+  color: #ffffff !important;
+  font-size: 24px !important;
+  -webkit-text-stroke: 2.5px #000;
+  paint-order: stroke fill;
+  text-shadow: 2px 2px 0px rgba(0,0,0,1);
+  letter-spacing: 0.5px;
+}
+
+body.geometry-dash .settings-entry {
+  color: #ffffff !important;
+  -webkit-text-stroke: 1.2px #000; /* Small text pro value */
+  paint-order: stroke fill;
+  text-shadow: 1px 1px 0px rgba(0,0,0,0.4);
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+
+/* --- Status Pills --- */
+body.geometry-dash .status-pill {
+  border: 3px solid #000 !important;
+  font-weight: 900 !important;
+  border-radius: 6px !important;
+}
+
+body.geometry-dash .status-pill.version {
+  background: #ffff00 !important;
+  color: #000 !important;
+  text-shadow: 0.5px 0.5px 0px rgba(0,0,0,0.3); /* Simpler shadow for very small text to keep readability */
+}
+
+body.geometry-dash .status-pill.geode {
+  background: #40e050 !important;
+  color: #000 !important;
+}
+
+/* --- Buttons: GD Chunky 3D Style --- */
+body.geometry-dash .primary-btn {
+  background: #40e050 !important;
+  border: 4px solid #000 !important;
+  box-shadow: 0 6px 0 #1a7a22 !important;
+  border-radius: 10px !important;
+  font-weight: 900 !important;
+  text-shadow: 2px 2px 0px rgba(0,0,0,0.5);
+  color: white !important;
+  letter-spacing: 1px;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+body.geometry-dash .primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 7px 0 #1a7a22 !important;
+}
+
+body.geometry-dash .primary-btn:active {
+  transform: translateY(4px) !important;
+  box-shadow: 0 2px 0 #1a7a22 !important;
+}
+
+body.geometry-dash .btn-secondary {
+  background: #4466cc !important;
+  border: 3px solid #000 !important;
+  box-shadow: 0 4px 0 #223388 !important;
+  border-radius: 8px !important;
+  color: white !important;
+  -webkit-text-stroke: 1px #000;
+  paint-order: stroke fill;
+  letter-spacing: 0.5px;
+}
+
+body.geometry-dash .icon-btn {
+  background: #4466cc !important;
+  border: 3px solid #000 !important;
+  box-shadow: 0 4px 0 #223388 !important;
+  border-radius: 8px !important;
+  color: white !important;
+}
+
+body.geometry-dash .icon-btn.delete {
+  background: #ff3333 !important;
+  box-shadow: 0 4px 0 #991111 !important;
+}
+
+/* --- Settings Card --- */
+body.geometry-dash .settings-card {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border: 3px solid #000 !important;
+  border-radius: 8px !important;
+}
+
+body.geometry-dash .theme-card {
+  border: 3px solid #000 !important;
+  border-radius: 8px !important;
+  font-weight: 800 !important;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.4);
+}
+
+body.geometry-dash .theme-card.active {
+  border-color: #ffff00 !important;
+  box-shadow: 0 0 10px rgba(255, 255, 0, 0.3), 0 3px 0 rgba(0,0,0,0.4) !important;
+}
+
+/* --- Mods Container (Geode Browser Panel) --- */
+body.geometry-dash .mods-container {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+body.geometry-dash .section-header {
+  background: rgba(0, 0, 0, 0.35) !important;
+  border: 3px solid #000 !important;
+  border-radius: 8px !important;
+  padding: 12px 16px !important;
+  margin-bottom: 12px !important; /* Creates gap between header and grid */
+}
+
+body.geometry-dash .mods-grid {
+  background: rgba(0, 0, 0, 0.25);
+  border: 3px solid #000;
+  border-radius: 8px; /* Full rounded corners */
+}
+
+
+/* --- Mod Card Rows (alternating purple tones) --- */
+body.geometry-dash .mod-card {
+  background: rgba(60, 40, 80, 0.5) !important;
+  border: none !important;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.5) !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: 16px 20px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+body.geometry-dash .mod-card:nth-child(even) {
+  background: rgba(45, 30, 65, 0.5) !important;
+}
+
+body.geometry-dash .mod-card:hover {
+  background: rgba(80, 55, 110, 0.6) !important;
+}
+
+body.geometry-dash .mod-version {
+  color: #40e050 !important;
+  font-size: 14px !important;
+  margin-left: 10px;
+  -webkit-text-stroke: 1px #000;
+  paint-order: stroke fill;
+}
+
+body.geometry-dash .mod-author {
+  color: #ffff00 !important;
+  font-size: 12px !important;
+  margin-top: 4px;
+  display: block;
+  -webkit-text-stroke: 0.8px #000;
+  paint-order: stroke fill;
+}
+
+/* --- Mod Action Buttons (View = blue, Get = green) --- */
+body.geometry-dash .switch {
+  box-sizing: border-box;
+}
+
+body.geometry-dash .switch .slider {
+  border: 2px solid #000;
+  box-sizing: border-box;
+}
+
+body.geometry-dash .switch .slider:before {
+  bottom: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+}
+
+body.geometry-dash .switch input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+
+body.geometry-dash .install-mod-btn {
+  background: #4466cc !important;
+  border: 3px solid #000 !important;
+  box-shadow: 0 3px 0 #223388 !important;
+  border-radius: 6px !important;
+  font-weight: 800 !important;
+}
+
+/* --- Search Box --- */
+body.geometry-dash .search-box {
+  background: rgba(0, 0, 0, 0.5) !important;
+  border: 3px solid #000 !important;
+  border-radius: 6px !important;
+}
+
+body.geometry-dash .search-box input {
+  color: #fff !important;
+  font-size: 14px !important;
+  -webkit-text-stroke: 1px #000;
+  paint-order: stroke fill;
+  letter-spacing: 0.5px;
+}
+
+body.geometry-dash .search-box input::placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+  -webkit-text-stroke: 0.5px #000;
+}
+
+/* --- Custom GD Scrollbar (Gold/Yellow) --- */
+body.geometry-dash *::-webkit-scrollbar {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+body.geometry-dash *::-webkit-scrollbar-track {
+  background: #111 !important;
+  border: 2px solid #000;
+}
+
+body.geometry-dash *::-webkit-scrollbar-thumb {
+  background: #ffff00 !important;
+  border: 3px solid #000 !important;
+  border-radius: 0 !important;
+}
+
+/* --- Modals in GD Theme --- */
+body.geometry-dash .modal {
+  background: #2D2433 !important;
+  border: 5px solid #000 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+}
+
+body.geometry-dash .modal h3 {
+  text-shadow: 2px 2px 0 #000 !important;
+}
+
+body.geometry-dash .modal-content {
+  background: #2D2433 !important;
+  border: 5px solid #000 !important;
+  border-radius: 10px !important;
+}
+
+/* --- Select Dropdowns --- */
+body.geometry-dash .settings-select {
+  background: rgba(0, 0, 0, 0.5) !important;
+  border: 3px solid #000 !important;
+  border-radius: 6px !important;
+  color: #fff !important;
+  font-weight: 700;
+}
+
+/* --- Hero / No Selection Screen --- */
+body.geometry-dash .hero-content h2 {
+  text-shadow: 3px 3px 0 #000 !important;
+}
+
+/* --- Accent Color Buttons --- */
+body.geometry-dash .accent-color-btn {
+  border: 3px solid #000 !important;
+}
+
+body.geometry-dash .accent-color-btn.active {
+  border-color: #ffff00 !important;
+  box-shadow: 0 0 10px rgba(255,255,0,0.4) !important;
+}
+
+
+body.kocmoc .sidebar, body.heliopolis .sidebar, body.black-hole .sidebar, body.nullscapes .sidebar {
   background: var(--bg-sidebar) !important;
-  backdrop-filter: blur(15px);
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(4px);
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 body.nullscapes {
@@ -123,6 +718,7 @@ body.black-hole .main-content,
 body.nullscapes .main-content,
 body.kocmoc .main-content {
   background: transparent !important;
+  backdrop-filter: blur(4px);
 }
 
 
@@ -138,9 +734,9 @@ body.black-hole .about-section,
 body.nullscapes .about-section,
 body.kocmoc .about-section,
 body.heliopolis .about-section {
-  backdrop-filter: blur(10px);
-  background: rgba(49, 51, 56, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: none;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 body.black-hole .settings-card,
@@ -274,9 +870,10 @@ body {
 }
 
 .sidebar-brand span {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text-primary);
+  letter-spacing: -0.3px;
 }
 
 .sidebar-header {
@@ -484,18 +1081,18 @@ body {
 }
 
 .status-box span {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text-dim);
-  text-transform: none;
-  letter-spacing: 0.5px;
+  letter-spacing: -0.2px;
 }
 
 .status-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
 }
 
 .main-content {
@@ -634,9 +1231,10 @@ body {
 }
 
 .title-section h1 {
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: white;
 }
 
 .status-pill {
@@ -765,11 +1363,10 @@ body {
 }
 
 .section-header h3 {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text-secondary);
-  text-transform: none;
-  letter-spacing: 0.5px;
+  letter-spacing: -0.1px;
 }
 
 .badge {
@@ -829,9 +1426,15 @@ body {
   overflow-y: auto;
   padding-right: 12px;
   margin-bottom: 20px;
+  transition: all 0.3s ease;
 }
 
-/* Clean up specific scrollbars in favor of global ones */
+.mods-grid.view-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-auto-rows: min-content;
+  align-content: start;
+}
 
 .mod-card {
   background: rgba(255,255,255,0.02);
@@ -841,17 +1444,96 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  transition: background 0.1s ease;
-  width: 100%;
-  position: relative;
   z-index: 1;
+  animation: cardEntry 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+@keyframes cardEntry {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.mod-card-grid {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  height: 100%;
+}
+
+.mod-card-grid .mod-info-box {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.mod-card-grid .mod-meta-details {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+}
+
+.mod-card-grid .mod-name {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.mod-card-grid .mod-actions-box {
+  width: 100%;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.05);
 }
 
 .mod-card:hover {
   background: rgba(255, 255, 255, 0.04);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .mod-info-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.mod-icon-wrapper {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.mod-card-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.mod-meta-details {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -875,12 +1557,13 @@ body {
 }
 
 .mod-name {
-  font-size: 13px;
-  font-weight: 400;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -0.2px;
 }
 
 .mod-info-btn {
@@ -995,6 +1678,7 @@ input:checked+.slider {
 input:checked+.slider:before {
   transform: translateX(20px);
   background-color: white;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
 }
 
 .content-view {
@@ -1286,12 +1970,15 @@ input:checked+.slider:before {
   transform: scale(1.1);
 }
 
-.accent-color-btn.active {
+.accent-color-btn.active, 
+#custom-accent-preview.active {
   border-color: white;
   box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  transform: scale(1.1);
 }
 
-body.light .accent-color-btn.active {
+body.light .accent-color-btn.active,
+body.light #custom-accent-preview.active {
   border-color: #000;
 }
 

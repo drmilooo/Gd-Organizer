@@ -1,0 +1,19 @@
+# GD Organizer - Changelog (v1.2.0)
+
+## Core & Performance
+- Deep Sleep System: Dynamic RAM management (Idle: ~100MB).
+- WebM Transition: Switched all assets to WebM for size reduction and efficiency.
+- Build Stabilization: Optimized Go-Wails backend bridge.
+- Added "Close Launcher on Launch" feature.
+
+## Preset & Mod Management
+- Instant Sync: Real-time file renaming for presets (no restart required).
+- Search-Index Fix: Resolved indexing conflicts during active searches.
+- Mod Detection: Auto-integration of new mods into active profiles.
+- Geode Stability: Improved file-system consistency for mod toggling.
+
+## Localization & UX
+- Spanish Support: Full translation for Spanish LATAM (es-419).
+- Terminology: "Instances" renamed to "Profiles" (Perfiles) in Spanish.
+- Branding: Unified branding to "GDOrganizer" across all modules.
+- Theme Fixes: Resolved CSS stacking issues during rapid theme switching.

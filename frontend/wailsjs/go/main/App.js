@@ -10,8 +10,12 @@ export function BrowseCatalog(arg1, arg2, arg3) {
   return window['go']['main']['App']['BrowseCatalog'](arg1, arg2, arg3);
 }
 
-export function CloseWindow() {
-  return window['go']['main']['App']['CloseWindow']();
+export function BulkToggleMods(arg1, arg2) {
+  return window['go']['main']['App']['BulkToggleMods'](arg1, arg2);
+}
+
+export function CloseApp() {
+  return window['go']['main']['App']['CloseApp']();
 }
 
 export function DeleteMod(arg1, arg2) {
@@ -46,8 +50,8 @@ export function LoadData(arg1) {
   return window['go']['main']['App']['LoadData'](arg1);
 }
 
-export function MinimizeWindow() {
-  return window['go']['main']['App']['MinimizeWindow']();
+export function MinimizeApp() {
+  return window['go']['main']['App']['MinimizeApp']();
 }
 
 export function OpenFile(arg1) {
@@ -58,10 +62,18 @@ export function OpenFolder() {
   return window['go']['main']['App']['OpenFolder']();
 }
 
+export function ReadLogs(arg1) {
+  return window['go']['main']['App']['ReadLogs'](arg1);
+}
+
 export function SaveData(arg1, arg2) {
   return window['go']['main']['App']['SaveData'](arg1, arg2);
 }
 
 export function ToggleMod(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ToggleMod'](arg1, arg2, arg3, arg4);
+}
+
+export function UpdateMod(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateMod'](arg1, arg2, arg3);
 }

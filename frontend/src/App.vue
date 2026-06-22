@@ -20,8 +20,9 @@ window.backend = {
   downloadCatalogMod: (p, url, id) => App.DownloadCatalogMod(p, url, id),
   saveData: (file, data) => App.SaveData(file, data),
   loadData: (file) => App.LoadData(file),
-  close: () => runtime.Quit(),
-  minimize: () => runtime.WindowMinimise(),
+  bulkToggleMods: (path, ops) => App.BulkToggleMods(path, ops),
+  closeApp: () => App.CloseApp(),
+  minimizeApp: () => App.MinimizeApp(),
   openExternal: (url) => runtime.BrowserOpenURL(url)
 };
 
@@ -89,7 +90,7 @@ onMounted(() => {
   const accentBtns = document.querySelectorAll('.accent-color-btn');
 
   let folders = [];
-  const defaultSettings = { "theme": "dark", "lang": "en-EN", "accent": "#0084cc", "accentRgb": "0, 132, 204", "closeOnLaunch": false, "uiScale": "1.0", "optimizeWallpaper": true };
+  const defaultSettings = { "theme": "dark", "lang": "en-EN", "accent": "#0084cc", "accentRgb": "0, 132, 204", "closeOnLaunch": false, "uiScale": "1.0", "optimizeWallpaper": true, "modListView": "list", "sortBy": "name" };
   let currentSettings = { ...defaultSettings };
   let isInitializing = true;
 
@@ -103,6 +104,8 @@ onMounted(() => {
   let checkingUpdates = false;
   let pendingPresetFolder = null;
   let currentDict = {};
+  let currentRenderId = 0;
+  let currentSyncId = 0;
   
   // Wallpaper State (Deep Sleep)
   let savedTime = 0;
@@ -154,19 +157,42 @@ onMounted(() => {
   };
 
   async function applyTheme(theme, shouldSave = true) {
-    document.body.classList.remove('light', 'dark', 'midnight', 'black-hole', 'nullscapes', 'kocmoc', 'heliopolis');
+    document.body.classList.remove('light', 'dark', 'midnight', 'black-hole', 'nullscapes', 'kocmoc', 'heliopolis', 'geometry-dash');
     let target = theme.toLowerCase().replace(/\s+/g, '-');
     
     if (target === 'system') {
       target = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
 
-    if (['light', 'dark', 'black-hole', 'nullscapes', 'kocmoc', 'heliopolis'].includes(target)) {
+    if (['light', 'dark', 'midnight', 'black-hole', 'nullscapes', 'kocmoc', 'heliopolis', 'geometry-dash'].includes(target)) {
       document.body.classList.add(target);
+    }
+    
+    if (target === 'custom') {
+      const c = currentSettings.customTheme || {
+        bgApp: "#1e1f22",
+        bgSidebar: "#111214",
+        textPrimary: "#dbdee1",
+        textSecondary: "#949ba4",
+        border: "rgba(255,255,255,0.05)"
+      };
+      document.documentElement.style.setProperty('--bg-app', c.bgApp);
+      document.documentElement.style.setProperty('--bg-sidebar', c.bgSidebar);
+      document.documentElement.style.setProperty('--text-primary', c.textPrimary);
+      document.documentElement.style.setProperty('--text-secondary', c.textSecondary);
+      document.documentElement.style.setProperty('--border', c.border);
+      document.body.classList.add('dark'); // Use dark base for custom
+    } else {
+      // Reset to :root variables by removing override
+      document.documentElement.style.removeProperty('--bg-app');
+      document.documentElement.style.removeProperty('--bg-sidebar');
+      document.documentElement.style.removeProperty('--text-primary');
+      document.documentElement.style.removeProperty('--text-secondary');
+      document.documentElement.style.removeProperty('--border');
     }
 
     // Dynamic RAM Optimization: Handle wallpaper existence
-    updateLiveWallpaper(target);
+    await updateLiveWallpaper(target);
 
     if (shouldSave) {
       currentSettings.theme = theme;
@@ -198,22 +224,65 @@ onMounted(() => {
     });
   }
 
-  async function applyAccentColor(hex, rgb, shouldSave = true) {
-    document.documentElement.style.setProperty('--accent', hex);
-    document.documentElement.style.setProperty('--accent-rgb', rgb);
+  function hexToRgb(hex) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `${r}, ${g}, ${b}`;
+  }
 
-    document.documentElement.style.setProperty('--accent-hover', hex);
-
-    if (shouldSave) {
+  let accentSaveTimeout = null;
+  function debouncedSaveAccent(hex, rgb) {
+    if (accentSaveTimeout) clearTimeout(accentSaveTimeout);
+    accentSaveTimeout = setTimeout(async () => {
+      if (isInitializing) return;
       currentSettings.accent = hex;
       currentSettings.accentRgb = rgb;
       await saveSettings();
-    }
+    }, 300);
+  }
 
-    accentBtns.forEach(btn => {
-      btn.classList.remove('active');
-      if (btn.getAttribute('data-color') === hex) btn.classList.add('active');
+  async function applyAccentColor(hex, rgb, shouldSave = true) {
+    // High performance UI update using requestAnimationFrame
+    requestAnimationFrame(() => {
+      document.documentElement.style.setProperty('--accent', hex);
+      document.documentElement.style.setProperty('--accent-rgb', rgb);
+      document.documentElement.style.setProperty('--accent-hover', hex);
+      
+      const customPreview = document.getElementById('custom-accent-preview');
+      const customPicker = document.getElementById('custom-accent-picker');
+      if (customPicker && customPicker.value !== hex) customPicker.value = hex;
+      if (customPreview) {
+        customPreview.style.background = hex;
+        customPreview.style.borderColor = 'rgba(255,255,255,0.4)';
+      }
+      
+      accentBtns.forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-color') === hex) btn.classList.add('active');
+      });
+
+      const allBtns = document.querySelectorAll('.accent-color-btn');
+      let isPreset = false;
+      allBtns.forEach(btn => {
+        if (btn.getAttribute('data-color') === hex && btn.id !== 'custom-accent-wrapper') isPreset = true;
+      });
+
+      if (customPreview) {
+        if (isPreset) {
+          customPreview.style.background = 'transparent';
+          customPreview.style.borderColor = 'rgba(255,255,255,0.1)';
+          customPreview.classList.remove('active');
+        } else {
+          customPreview.classList.add('active');
+        }
+      }
     });
+
+    if (shouldSave) {
+      // Debounce disk I/O to prevent lag
+      debouncedSaveAccent(hex, rgb);
+    }
   }
 
   async function applyUIScale(scale, shouldSave = true) {
@@ -248,54 +317,75 @@ onMounted(() => {
   }
 
   function updateLiveWallpaper(target) {
-    const container = document.getElementById('theme-bg-container');
-    if (!container) return;
+    return new Promise((resolve) => {
+      const container = document.getElementById('theme-bg-container');
+      if (!container) { resolve(); return; }
 
-    // Clear background
-    container.innerHTML = '';
-
-    const liveThemes = {
-      'black-hole': { src: '/bhppr.webm', class: 'black-hole-bg' },
-      'nullscapes': { src: '/nullscapes.webm', class: 'nullscapes-bg', rate: 0.7 },
-      'kocmoc': { src: '/kocmoc.webm', class: 'kocmoc-bg' },
-      'heliopolis': { src: '/heliopolis.webm', class: 'heliopolis-bg', start: 8, loopReset: 20 }
-    };
-
-    const config = liveThemes[target];
-    if (config) {
-      const video = document.createElement('video');
-      video.className = `theme-bg-video ${config.class}`;
-      video.muted = true;
-      video.loop = !config.loopReset; // If manual loop logic needed, loop is handled by event
-      video.playsInline = true;
-      video.style.display = 'block';
-      
-      const source = document.createElement('source');
-      source.src = config.src;
-      source.type = config.src.endsWith('.webm') ? 'video/webm' : 'video/mp4';
-      video.appendChild(source);
-
-      if (config.rate) video.playbackRate = config.rate;
-      if (config.start) video.onloadedmetadata = () => { video.currentTime = config.start; };
-
-      if (config.loopReset) {
-        video.ontimeupdate = () => {
-          if (video.currentTime >= config.loopReset) video.currentTime = config.start || 0;
-        };
+      // Clear background thoroughly to release RAM/CPU
+      const oldVideo = container.querySelector('video');
+      if (oldVideo) {
+        oldVideo.pause();
+        oldVideo.src = "";
+        oldVideo.load();
+        oldVideo.remove();
       }
+      container.innerHTML = '';
 
-      container.appendChild(video);
-      video.play().catch(e => console.log("Dynamic Video Error:", e));
-      
-      // Update state for Deep Sleep wake/sleep
-      activeLiveTheme = target;
-    } else {
-      activeLiveTheme = null;
-    }
+      const liveThemes = {
+        'black-hole': { src: '/bhppr.webm', class: 'black-hole-bg' },
+        'nullscapes': { src: '/nullscapes.webm', class: 'nullscapes-bg', rate: 0.7 },
+        'kocmoc': { src: '/kocmoc.webm', class: 'kocmoc-bg' },
+        'heliopolis': { src: '/heliopolis.webm', class: 'heliopolis-bg', start: 8, loopReset: 20 }
+      };
+
+      const config = liveThemes[target];
+      if (config) {
+        const video = document.createElement('video');
+        video.className = `theme-bg-video ${config.class}`;
+        video.muted = true;
+        video.loop = !config.loopReset;
+        video.playsInline = true;
+        video.style.display = 'block';
+        
+        const source = document.createElement('source');
+        source.src = config.src;
+        source.type = config.src.endsWith('.webm') ? 'video/webm' : 'video/mp4';
+        video.appendChild(source);
+
+        if (config.rate) video.playbackRate = config.rate;
+        if (config.start) video.onloadedmetadata = () => { video.currentTime = config.start; };
+
+        // Signal ready
+        video.oncanplaythrough = () => {
+          resolve();
+        };
+        // Failsafe for slow connections/errors
+        setTimeout(resolve, 4000);
+
+        if (config.loopReset) {
+          video.ontimeupdate = () => {
+            if (video.currentTime >= config.loopReset) video.currentTime = config.start || 0;
+          };
+        }
+
+        container.appendChild(video);
+        video.play().catch(e => {
+          console.log("Dynamic Video Error:", e);
+          resolve();
+        });
+        
+        activeLiveTheme = target;
+      } else {
+        activeLiveTheme = null;
+        resolve();
+      }
+    });
   }
 
   async function saveSettings() {
     if (isInitializing) return;
+    currentSettings.lastInstanceId = currentSelectionId;
+    currentSettings.lastPresetId = activePresetId;
     await window.backend.saveData('settings.json', JSON.stringify(currentSettings));
   }
 
@@ -380,6 +470,7 @@ onMounted(() => {
       currentSettings.lang = code;
       if (!isInitializing) await saveSettings();
       if (langSelect) langSelect.value = code;
+      if (sortSelect) sortSelect.value = currentSettings.sortBy || 'name';
 
       renderFolders();
       if (currentSelectionId) renderMods(currentMods);
@@ -392,17 +483,135 @@ onMounted(() => {
   themeCards.forEach(card => {
     card.addEventListener('click', () => {
       const themeId = card.getAttribute('data-theme');
-      applyTheme(themeId);
+      if (themeId === 'custom' && currentSettings.theme === 'custom') {
+        openThemeEditor();
+      } else {
+        applyTheme(themeId);
+      }
     });
   });
+
+  let originalCustomTheme = null;
+
+  function openThemeEditor() {
+    const modal = document.getElementById('theme-editor-modal');
+    const c = currentSettings.customTheme || {
+      bgApp: "#1e1f22",
+      bgSidebar: "#111214",
+      textPrimary: "#dbdee1",
+      textSecondary: "#949ba4",
+      border: "rgba(255,255,255,0.05)"
+    };
+    
+    // Backup for cancel
+    originalCustomTheme = { ...c };
+    
+    document.getElementById('edit-bg-app').value = c.bgApp;
+    document.getElementById('edit-bg-sidebar').value = c.bgSidebar;
+    document.getElementById('edit-text-primary').value = c.textPrimary;
+    document.getElementById('edit-text-secondary').value = c.textSecondary;
+
+    // Sync Mini Mockup initially
+    const miniSidebar = document.getElementById('mini-sidebar');
+    const miniContent = document.getElementById('mini-content');
+    const miniTextP = document.getElementById('mini-text-p');
+    const miniTextS = document.getElementById('mini-text-s');
+    
+    if (miniSidebar) miniSidebar.style.background = c.bgSidebar;
+    if (miniContent) miniContent.style.background = c.bgApp;
+    if (miniTextP) miniTextP.style.background = c.textPrimary;
+    if (miniTextS) miniTextS.style.background = c.textSecondary;
+    
+    modal.classList.add('active');
+  }
+
+  const closeThemeEditorBtn = document.getElementById('close-theme-editor');
+  if (closeThemeEditorBtn) {
+    closeThemeEditorBtn.onclick = () => {
+      document.getElementById('theme-editor-modal').classList.remove('active');
+      // Revert if cancelled
+      if (originalCustomTheme) {
+        currentSettings.customTheme = originalCustomTheme;
+        applyTheme('custom', false);
+      }
+    };
+  }
+
+  // Real-time preview listeners
+  ['edit-bg-app', 'edit-bg-sidebar', 'edit-text-primary', 'edit-text-secondary'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', () => {
+        const c = {
+          bgApp: document.getElementById('edit-bg-app').value,
+          bgSidebar: document.getElementById('edit-bg-sidebar').value,
+          textPrimary: document.getElementById('edit-text-primary').value,
+          textSecondary: document.getElementById('edit-text-secondary').value,
+          border: "rgba(255,255,255,0.05)" 
+        };
+        // Apply instantly to UI
+        document.documentElement.style.setProperty('--bg-app', c.bgApp);
+        document.documentElement.style.setProperty('--bg-sidebar', c.bgSidebar);
+        document.documentElement.style.setProperty('--text-primary', c.textPrimary);
+        document.documentElement.style.setProperty('--text-secondary', c.textSecondary);
+
+        // Update Mini Mockup
+        const miniSidebar = document.getElementById('mini-sidebar');
+        const miniContent = document.getElementById('mini-content');
+        const miniTextP = document.getElementById('mini-text-p');
+        const miniTextS = document.getElementById('mini-text-s');
+        
+        if (miniSidebar) miniSidebar.style.background = c.bgSidebar;
+        if (miniContent) miniContent.style.background = c.bgApp;
+        if (miniTextP) miniTextP.style.background = c.textPrimary;
+        if (miniTextS) miniTextS.style.background = c.textSecondary;
+      });
+    }
+  });
+
+  const saveCustomThemeBtn = document.getElementById('save-custom-theme');
+  if (saveCustomThemeBtn) {
+    saveCustomThemeBtn.onclick = async () => {
+      const c = {
+        bgApp: document.getElementById('edit-bg-app').value,
+        bgSidebar: document.getElementById('edit-bg-sidebar').value,
+        textPrimary: document.getElementById('edit-text-primary').value,
+        textSecondary: document.getElementById('edit-text-secondary').value,
+        border: "rgba(255,255,255,0.05)" 
+      };
+      currentSettings.customTheme = c;
+      applyTheme('custom');
+      document.getElementById('theme-editor-modal').classList.remove('active');
+    };
+  }
 
   accentBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       const hex = btn.getAttribute('data-color');
+      if (!hex) return;
       const rgb = btn.getAttribute('data-rgb');
       applyAccentColor(hex, rgb);
     });
   });
+
+  const customAccentPicker = document.getElementById('custom-accent-picker');
+  if (customAccentPicker) {
+    customAccentPicker.addEventListener('input', (e) => {
+      const hex = e.target.value;
+      const rgb = hexToRgb(hex);
+      // Real-time UI update, debounced save
+      applyAccentColor(hex, rgb, true);
+    });
+    
+    // Explicit save on change (user finished picking)
+    customAccentPicker.addEventListener('change', async (e) => {
+      const hex = e.target.value;
+      const rgb = hexToRgb(hex);
+      currentSettings.accent = hex;
+      currentSettings.accentRgb = rgb;
+      await saveSettings();
+    });
+  }
 
   langSelect.addEventListener('change', (e) => {
     applyLanguage(e.target.value);
@@ -432,6 +641,36 @@ onMounted(() => {
   applyAccentColor(currentSettings.accent || '#0084cc', currentSettings.accentRgb || '0, 132, 204');
   applyLanguage(currentSettings.lang || 'en-EN');
   
+  // Initialize View Mode
+  if (modsListEl) {
+    modsListEl.classList.remove('view-list', 'view-grid');
+    modsListEl.classList.add('view-' + (currentSettings.modListView || 'list'));
+  }
+  
+  const toggleViewBtn = document.getElementById('toggle-view-btn');
+  if (toggleViewBtn) {
+    toggleViewBtn.addEventListener('click', () => {
+      currentSettings.modListView = currentSettings.modListView === 'grid' ? 'list' : 'grid';
+      saveSettings();
+      if (modsListEl) {
+        modsListEl.classList.remove('view-list', 'view-grid');
+        modsListEl.classList.add('view-' + currentSettings.modListView);
+      }
+      renderMods(currentMods);
+      updateViewToggleIcon();
+    });
+  }
+
+  function updateViewToggleIcon() {
+    const btn = document.getElementById('toggle-view-btn');
+    if (!btn) return;
+    const isGrid = currentSettings.modListView === 'grid';
+    btn.innerHTML = isGrid 
+      ? `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>`
+      : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>`;
+  }
+  updateViewToggleIcon();
+
   syncState();
 
   function toggleSettingsMode(active) {
@@ -502,9 +741,80 @@ onMounted(() => {
     renderMods(currentMods);
   });
 
+  const sortSelect = document.getElementById('sort-mods-select');
+  sortSelect.addEventListener('change', (e) => {
+    currentSettings.sortBy = e.target.value;
+    saveSettings();
+    renderMods(currentMods);
+  });
+
+  const viewLogsBtn = document.getElementById('view-logs-btn');
+  const logModal = document.getElementById('log-modal');
+  const logContent = document.getElementById('log-content');
+  const closeLogsBtn = document.getElementById('close-logs-btn');
+  const refreshLogsBtn = document.getElementById('refresh-logs-btn');
+
+  async function loadLogs() {
+    if (!currentSelectionId) return;
+    const selected = folders.find(f => f.id === currentSelectionId);
+    logContent.textContent = "Loading logs...";
+    const logs = await window.backend.readLogs(selected.path);
+    logContent.textContent = logs;
+    // Scroll to bottom
+    const modalBody = logModal.querySelector('.modal-body');
+    setTimeout(() => { modalBody.scrollTop = modalBody.scrollHeight; }, 50);
+  }
+
+  viewLogsBtn.onclick = () => {
+    logModal.classList.add('active');
+    loadLogs();
+  };
+  closeLogsBtn.onclick = () => logModal.classList.remove('active');
+  refreshLogsBtn.onclick = () => loadLogs();
+
+  const updateAllBtn = document.getElementById('update-all-btn');
+  updateAllBtn.onclick = async () => {
+    if (!currentSelectionId) return;
+    const selected = folders.find(f => f.id === currentSelectionId);
+    const updates = currentMods.filter(m => {
+      const vLatest = modUpdates[m.id];
+      if (!vLatest) return false;
+      return vLatest.replace(/^v+/i, '') !== String(m.version || '').replace(/^v+/i, '');
+    });
+
+    if (updates.length === 0) return;
+    if (!await window.customConfirm(`Update ${updates.length} mods to their latest versions?`)) return;
+
+    updateAllBtn.textContent = "UPDATING...";
+    updateAllBtn.disabled = true;
+
+    for (const mod of updates) {
+      const info = await window.backend.fetchModInfo(mod.id);
+      const downloadLink = info?.versions?.[0]?.download_link;
+      if (downloadLink) {
+        await window.backend.updateMod(selected.path, mod.id, downloadLink);
+      }
+    }
+
+    updateAllBtn.textContent = "DONE!";
+    setTimeout(() => {
+      updateAllBtn.textContent = "UPDATE ALL";
+      updateAllBtn.disabled = false;
+      refreshMods();
+    }, 2000);
+  };
+
   // Removed legacy Vanilla JS click listener
 
+  function updateLoading(pct, status) {
+    const bar = document.getElementById('loading-bar');
+    const statusEl = document.getElementById('loading-status');
+    if (bar) bar.style.width = pct + '%';
+    if (statusEl && status) statusEl.textContent = status;
+  }
+
   async function initApp() {
+    updateLoading(10, "Loading folders...");
     try {
       const rawFolders = await window.backend.loadData('folders.json');
       if (rawFolders) {
@@ -517,6 +827,7 @@ onMounted(() => {
         }
       }
 
+      updateLoading(30, "Loading configuration...");
       const rawSettings = await window.backend.loadData('settings.json');
       if (rawSettings) {
         try {
@@ -539,8 +850,11 @@ onMounted(() => {
       console.error("Primary data load failed:", e);
     }
 
+    updateLoading(50, "Applying theme...");
     // Set UI with final settings
     await applyTheme(currentSettings.theme || "dark", false);
+    
+    updateLoading(70, "Finalizing UI...");
     await applyAccentColor(currentSettings.accent || "#0084cc", currentSettings.accentRgb || "0, 132, 204", false);
     await applyUIScale(currentSettings.uiScale || "1.0", false);
     await applyLanguage(currentSettings.lang || "en-EN");
@@ -548,11 +862,23 @@ onMounted(() => {
     closeOnLaunchCheck.checked = currentSettings.closeOnLaunch || false;
     optimizeWallpaperCheck.checked = currentSettings.optimizeWallpaper !== undefined ? currentSettings.optimizeWallpaper : true;
 
+    updateLoading(90, "Syncing...");
     renderFolders();
     
-    // END initialization
-    isInitializing = false;
-    syncState();
+    updateLoading(100, "Done!");
+    // Smooth transition
+    setTimeout(async () => {
+      isInitializing = false;
+      syncState();
+
+      if (currentSettings.lastInstanceId) {
+        const found = folders.find(f => f.id === currentSettings.lastInstanceId);
+        if (found) {
+          activePresetId = currentSettings.lastPresetId || null;
+          await selectFolder(found.id, true);
+        }
+      }
+    }, 700);
   }
 
   async function saveFolders() {
@@ -566,16 +892,47 @@ onMounted(() => {
 
   async function selectPresetContext(folder, presetId) {
     activePresetId = presetId;
-    renderFolders();
+    saveSettings();
     
     if (activePresetId) {
       const preset = folder.presets.find(p => p.id === activePresetId);
       if (preset) {
+        quickSyncPresetUI(preset);
         await syncDiskToPreset(folder, preset);
+        return; // Skip full refresh
       }
     }
     
+    renderFolders();
     refreshMods();
+  }
+
+  function quickSyncPresetUI(preset) {
+    // 1. Update In-memory currentMods metadata immediately
+    currentMods.forEach(m => {
+      if (preset.mods[m.id] !== undefined) {
+        m.enabled = (preset.mods[m.id] === true);
+      }
+    });
+
+    // 2. Update Header Title
+    const headerTitle = document.getElementById('mods-header-title');
+    if (headerTitle) {
+      headerTitle.textContent = (currentDict.editing_preset || "Editing Preset") + `: ${preset.name}`;
+    }
+
+    // 3. Update Checkboxes in current list
+    const checkboxes = modsListEl.querySelectorAll('input[type="checkbox"][data-id]');
+    checkboxes.forEach(cb => {
+      const modId = cb.getAttribute('data-id');
+      if (preset.mods[modId] !== undefined) {
+        cb.checked = (preset.mods[modId] === true);
+      }
+    });
+
+    // 4. Update Stats and trigger sidebar re-render for active state
+    updateModStats(currentMods);
+    renderFolders();
   }
 
   function openPresetModal(folder) {
@@ -622,26 +979,31 @@ onMounted(() => {
     if (!preset) return;
 
     activePresetId = preset.id;
-    renderFolders();
-
+    saveSettings();
+    
     await syncDiskToPreset(folder, preset);
-
-    refreshMods();
-
+    quickSyncPresetUI(preset);
+    
     await window.backend.launchGame(folder.path);
   }
 
   async function syncDiskToPreset(folder, preset) {
+    const syncId = ++currentSyncId;
     try {
       const modsOnDisk = await window.backend.getMods(folder.path);
+      if (syncId !== currentSyncId) return; // Cancel if newer sync started
+
+      const ops = [];
       for (const m of modsOnDisk) {
-        // Only override if the preset explicitly has a record for this mod
         if (preset.mods[m.id] !== undefined) {
           const targetStatus = (preset.mods[m.id] === true);
           if (m.enabled !== targetStatus) {
-            await window.backend.toggleMod(folder.path, m.id, targetStatus, m.file);
+            ops.push({ file: m.file, enabled: targetStatus });
           }
         }
+      }
+      if (ops.length > 0) {
+        await window.backend.bulkToggleMods(folder.path, ops);
       }
     } catch (err) {
       console.error("Sync error:", err);
@@ -655,8 +1017,10 @@ onMounted(() => {
     renderFolders();
   }
 
-  async function selectFolder(id) {
+  async function selectFolder(id, preservePreset = false) {
+    if (!preservePreset && currentSelectionId !== id) activePresetId = null; 
     currentSelectionId = id;
+    saveSettings();
     renderFolders();
 
     const selected = folders.find(f => f.id === id);
@@ -708,7 +1072,20 @@ onMounted(() => {
         const installBtn = document.getElementById('install-mod-btn');
         if (installBtn) installBtn.style.display = 'flex';
 
+        modsListEl.innerHTML = `
+          <div class="loading-mods-container" style="padding: 60px 0; text-align: center; width: 100%; grid-column: 1 / -1;">
+            <div class="loading-spinner" style="margin: 0 auto 20px auto; width: 30px; height: 30px; border: 3px solid rgba(255,255,255,0.05); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+            <div style="font-size: 16px; font-weight: 700; color: white; letter-spacing: -0.3px;">Loading mods...</div>
+            <div id="render-status" style="font-size: 11px; color: var(--text-dim); margin-top: 8px;">Accessing instance directory and extracting metadata</div>
+          </div>
+        `;
         currentMods = await window.backend.getMods(selected.path);
+
+        if (preservePreset && activePresetId) {
+          const preset = selected.presets?.find(p => p.id === activePresetId);
+          if (preset) await syncDiskToPreset(selected, preset);
+        }
+
         renderMods(currentMods);
       } else {
         geodeIcon.style.display = 'none';
@@ -721,7 +1098,7 @@ onMounted(() => {
           gdpsIcon.style.display = 'none';
           vanillaIcon.style.display = 'flex';
         }
-        modsSection.style.display = 'block';
+        modsSection.style.display = analysis.hasGeode ? 'block' : 'none';
         const installBtn = document.getElementById('install-mod-btn');
         if (installBtn) installBtn.style.display = 'none';
         currentMods = [];
@@ -746,7 +1123,7 @@ onMounted(() => {
     checkingUpdates = true;
 
     modUpdates = {};
-    updateStatsUI('checking', 0, currentMods.length);
+    updateModStats(currentMods, 'checking', 0, currentMods.length);
 
     let count = 0;
     for (const mod of currentMods) {
@@ -755,31 +1132,81 @@ onMounted(() => {
         modUpdates[mod.id] = info.versions?.[0]?.version || null;
       }
       count++;
-      updateStatsUI('checking', count, currentMods.length);
+      updateModStats(currentMods, 'checking', count, currentMods.length);
       renderMods(currentMods);
     }
     checkingUpdates = false;
   }
 
-  function updateStatsUI(status, current, total) {
+  function updateModStats(modsList, status = 'idle', current = 0, total = 0) {
     const statsEl = document.getElementById('mod-stats');
     if (!statsEl) return;
+
     if (status === 'checking') {
-      statsEl.innerHTML = `<span style="color: var(--accent); font-weight: bold;">${currentMods.length}</span> MODS FOUND · <span style="color: var(--text-dim);">CHECKING (${current}/${total})...</span>`;
+      statsEl.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-dim); font-weight: 500;">
+          <div class="status-dot" style="background: var(--accent); animation: pulse 1.5s infinite;"></div>
+          <span>${currentDict.checking || 'Checking'} (${current}/${total})...</span>
+        </div>
+      `;
+      return;
     }
+
+    const currentFolder = folders.find(f => f.id === currentSelectionId);
+    const preset = (currentFolder && activePresetId) ? currentFolder.presets.find(p => p.id === activePresetId) : null;
+    const enabledCount = (modsList || []).filter(m => {
+      return preset ? (preset.mods[m.id] === true) : m.enabled;
+    }).length;
+
+    const modsFoundText = currentDict.mods_found || "mods found";
+    const modActiveText = currentDict.mod_active || "active";
+
+    statsEl.innerHTML = `
+      <div style="display: flex; items-center; gap: 12px; font-size: 11px; font-weight: 500; color: var(--text-dim);">
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="color: var(--text-secondary);">${(modsList || []).length}</span>
+          <span>${modsFoundText}</span>
+        </div>
+        <div style="width: 1px; height: 10px; background: var(--border);"></div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="color: var(--accent);">${enabledCount}</span>
+          <span>${modActiveText}</span>
+          ${preset ? `<span style="opacity: 0.6; font-size: 10px;">(${preset.name})</span>` : ''}
+        </div>
+      </div>
+    `;
   }
 
   function renderMods(mods) {
-    const searchTerm = document.getElementById('mod-search').value.toLowerCase();
-    const modsToRender = mods.filter(m => 
+    const folder = folders.find(f => f.id === currentSelectionId);
+    if (!folder) return;
+
+    const searchTermEl = document.getElementById('mod-search');
+    const searchTerm = searchTermEl ? searchTermEl.value.toLowerCase() : '';
+
+    let modsToRender = mods.filter(m => 
       m.name.toLowerCase().includes(searchTerm) || 
       m.id.toLowerCase().includes(searchTerm)
     );
 
-    modsListEl.innerHTML = '';
-    const folder = folders.find(f => f.id === currentSelectionId);
-    if (!folder) return;
+    const sortBy = currentSettings.sortBy || 'name';
+    modsToRender.sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'version') return b.version.localeCompare(a.version);
+      if (sortBy === 'enabled') {
+        const aE = folder.presets && activePresetId ? (folder.presets.find(p => p.id === activePresetId)?.mods[a.id] ?? a.enabled) : a.enabled;
+        const bE = folder.presets && activePresetId ? (folder.presets.find(p => p.id === activePresetId)?.mods[b.id] ?? b.enabled) : b.enabled;
+        return (bE === aE) ? a.name.localeCompare(b.name) : (bE ? 1 : -1);
+      }
+      return 0;
+    });
 
+    modsListEl.innerHTML = '';
+    const isGrid = currentSettings.modListView === 'grid';
+    
+    // Progressive Rendering Logic
+    const renderId = ++currentRenderId;
+    
     let preset = null;
     if (activePresetId) {
       preset = folder.presets.find(p => p.id === activePresetId);
@@ -793,120 +1220,136 @@ onMounted(() => {
       headerTitle.textContent = modeText;
     }
 
-    modsToRender.forEach(mod => {
-      try {
-        const isEnabled = preset ? (preset.mods[mod.id] !== undefined ? preset.mods[mod.id] : mod.enabled) : mod.enabled;
-        const isChecked = isEnabled ? 'checked' : '';
+    // Process mods: First 10 instantly for responsiveness, then stagger
+    let renderedCount = 0;
+    const totalToRender = modsToRender.length;
+    
+    if (totalToRender === 0) {
+      modsListEl.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--text-dim); font-size: 13px; grid-column: 1/-1;">No mods installed in this instance.</div>`;
+      updateModStats(mods);
+      return;
+    }
 
-        const card = document.createElement('div');
-        card.className = 'mod-card';
-
-        const latestVersion = modUpdates[mod.id];
-        let updateAvailable = false;
-        if (latestVersion) {
-          const vLocal = String(mod.version || '').replace(/^v+/i, '').trim();
-          const vLatest = String(latestVersion || '').replace(/^v+/i, '').trim();
-          if (vLatest && vLocal && vLatest !== vLocal) {
-            updateAvailable = true;
-          }
+    modsToRender.forEach((mod, index) => {
+      const delay = index < 10 ? 0 : Math.min((index - 10) * 20, 400);
+      
+      setTimeout(() => {
+        if (renderId !== currentRenderId) return;
+        
+        // Update loading status if still showing placeholder
+        const statusEl = document.getElementById('render-status');
+        if (statusEl) {
+          statusEl.textContent = `Rendering mod ${renderedCount + 1} of ${totalToRender}...`;
         }
+        
+        // Remove loading placeholder on first mod
+        if (renderedCount === 0) modsListEl.innerHTML = '';
+        renderedCount++;
+        
+        try {
+          const isEnabled = preset ? (preset.mods[mod.id] !== undefined ? preset.mods[mod.id] : mod.enabled) : mod.enabled;
+          const isChecked = isEnabled ? 'checked' : '';
 
-        card.innerHTML = `
-          <div class="mod-info-box">
-            <div style="display: flex; align-items: baseline; gap: 8px;">
-              <span class="mod-name" title="${mod.name}">${mod.name}</span>
-              <span style="font-size: 11px; color: rgba(255,255,255,0.3); font-weight: 500;">${String(mod.version || '0.0.0').replace(/^v+/i, '')}</span>
-            </div>
-            <div class="mod-info-btn" data-desc="${mod.description || 'No description provided.'}">i</div>
-            ${updateAvailable ? `<span class="update-badge" title="Latest: ${latestVersion}">UPDATE AVAILABLE</span>` : ''}
-          </div>
+          const card = document.createElement('div');
+          card.className = isGrid ? 'mod-card mod-card-grid' : 'mod-card';
+          card.style.animationDelay = `${Math.min(index * 30, 600)}ms`;
 
-          <div class="mod-actions-box">
-            <button class="mod-delete-btn" title="Delete Mod File">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
-            <label class="switch">
-              <input type="checkbox" ${isChecked} data-id="${mod.id}">
-              <span class="slider"></span>
-            </label>
-          </div>
-        `;
-
-        // Action Bindings
-        const deleteBtn = card.querySelector('.mod-delete-btn');
-        deleteBtn.onclick = async () => {
-          if (await window.customConfirm(currentDict.delete_mod_confirm || `Are you sure you want to delete "${mod.name}" mod file permanently?`)) {
-            const res = await window.backend.deleteMod(folder.path, mod.file);
-            if (res.success) refreshMods();
-            else alert("Error deleting mod: " + res.error);
-          }
-        };
-
-        const checkbox = card.querySelector('input[type="checkbox"]');
-        checkbox.onchange = async (e) => {
-          const enabled = e.target.checked;
-          const modId = e.target.getAttribute('data-id');
-          
-          if (!enabled) {
-            const dependents = currentMods.filter(m => {
-              const mEnabled = preset ? (preset.mods[m.id] !== undefined ? preset.mods[m.id] : m.enabled) : m.enabled;
-              if (!mEnabled || !m.dependencies) return false;
-              return m.dependencies.some(d => String(d).toLowerCase() === modId.toLowerCase());
-            });
-
-            if (dependents.length > 0) {
-              e.preventDefault();
-              e.target.checked = true;
-              showDependencyWarning(mod, dependents);
-              return;
+          const latestVersion = modUpdates[mod.id];
+          let updateAvailable = false;
+          if (latestVersion) {
+            const vLocal = String(mod.version || '').replace(/^v+/i, '').trim();
+            const vLatest = String(latestVersion || '').replace(/^v+/i, '').trim();
+            if (vLatest && vLocal && vLatest !== vLocal) {
+              updateAvailable = true;
             }
           }
-          performToggle(modId, enabled, card);
-        };
 
-        const infoBtn = card.querySelector('.mod-info-btn');
-        infoBtn.onclick = () => {
-          document.getElementById('desc-modal-title').textContent = mod.name;
-          document.getElementById('desc-modal-body').textContent = mod.description || 'No description provided.';
-          document.getElementById('desc-modal').classList.add('active');
-        };
+          card.innerHTML = `
+            <div class="mod-info-box">
+              <div class="mod-icon-wrapper">
+                <img src="${mod.icon || '/geodelogo.png'}" class="mod-card-icon" onerror="this.src='/geodelogo.png'">
+              </div>
+              <div class="mod-meta-details">
+                <div style="display: flex; align-items: baseline; gap: 8px;">
+                  <span class="mod-name" title="${mod.name}">${mod.name}</span>
+                  <span style="font-size: 11px; color: rgba(255,255,255,0.3); font-weight: 500;">${String(mod.version || '0.0.0').replace(/^v+/i, '')}</span>
+                </div>
+                <div class="mod-info-btn" data-desc="${mod.description || 'No description provided.'}">i</div>
+                ${updateAvailable ? `<span class="update-badge" title="Latest: ${latestVersion}">Update Available</span>` : ''}
+              </div>
+            </div>
 
-        modsListEl.appendChild(card);
-      } catch (err) {
-        console.error("Error rendering mod card:", err);
-      }
+            <div class="mod-actions-box">
+              <button class="mod-delete-btn" title="Delete Mod File">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+              <label class="switch">
+                <input type="checkbox" ${isChecked} data-id="${mod.id}">
+                <span class="slider"></span>
+              </label>
+            </div>
+          `;
+
+          // Action Bindings
+          const deleteBtn = card.querySelector('.mod-delete-btn');
+          deleteBtn.onclick = async () => {
+            if (await window.customConfirm(currentDict.delete_mod_confirm || `Are you sure you want to delete "${mod.name}" mod file permanently?`)) {
+              const res = await window.backend.deleteMod(folder.path, mod.file);
+              if (res.success) refreshMods();
+              else alert("Error deleting mod: " + res.error);
+            }
+          };
+
+          const checkbox = card.querySelector('input[type="checkbox"]');
+          checkbox.onchange = async (e) => {
+            const enabled = e.target.checked;
+            const modId = e.target.getAttribute('data-id');
+            
+            if (!enabled) {
+              const dependents = currentMods.filter(m => {
+                const mEnabled = preset ? (preset.mods[m.id] !== undefined ? preset.mods[m.id] : m.enabled) : m.enabled;
+                if (!mEnabled || !m.dependencies) return false;
+                return m.dependencies.some(d => String(d).toLowerCase() === modId.toLowerCase());
+              });
+
+              if (dependents.length > 0) {
+                e.preventDefault();
+                e.target.checked = true;
+                showDependencyWarning(mod, dependents);
+                return;
+              }
+            }
+            performToggle(modId, enabled, card);
+          };
+
+          const infoBtn = card.querySelector('.mod-info-btn');
+          infoBtn.onclick = () => {
+            document.getElementById('desc-modal-title').textContent = mod.name;
+            document.getElementById('desc-modal-body').textContent = mod.description || 'No description provided.';
+            document.getElementById('desc-modal').classList.add('active');
+          };
+
+          modsListEl.appendChild(card);
+        } catch (err) {
+          console.error("Error rendering mod card:", err);
+        }
+      }, 0); // We use 0ms or very small delay to keep it responsive but sequential
     });
 
     updateModStats(mods);
+    
+    // Check if any updates exist to show/hide "Update All" button
+    const anyUpdates = modsToRender.some(m => {
+      const vLatest = modUpdates[m.id];
+      if (!vLatest) return false;
+      return vLatest.replace(/^v+/i, '') !== String(m.version || '').replace(/^v+/i, '');
+    });
+    if (updateAllBtn) updateAllBtn.style.display = anyUpdates ? 'block' : 'none';
   }
 
-  function updateModStats(modsList) {
-    const statsEl = document.getElementById('mod-stats');
-    if (!statsEl) return;
-
-    const folder = folders.find(f => f.id === currentSelectionId);
-    const preset = (folder && activePresetId) ? folder.presets.find(p => p.id === activePresetId) : null;
-    const enabledCount = modsList.filter(m => {
-      return preset ? (preset.mods[m.id] === true) : m.enabled;
-    }).length;
-
-    const modsFoundText = currentDict.mods_found || "mods found";
-    const modActiveText = currentDict.mod_active || "mod active";
-
-    statsEl.style.textTransform = 'none';
-    statsEl.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="color: var(--text-secondary); font-weight: 500; font-size: 11px;">${modsList.length} ${modsFoundText}</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="color: var(--text-secondary); font-weight: 500; font-size: 11px;">${enabledCount} ${modActiveText} ${preset ? '(' + (currentDict.in_preset || "in preset") + ')' : ''}</span>
-        </div>
-      </div>
-    `;
-  }
+  // Removed redundant updateModStats definition
 
 
   document.addEventListener('click', async (e) => {
@@ -947,9 +1390,9 @@ onMounted(() => {
     if (!pendingInstallPath || !currentSelectionId) return;
     const selected = folders.find(f => f.id === currentSelectionId);
 
-    confirmInstallBtn.textContent = 'ADDING...';
+    confirmInstallBtn.textContent = 'Adding...';
     const res = await window.backend.installMod(selected.path, pendingInstallPath);
-    confirmInstallBtn.textContent = 'ADD MOD';
+    confirmInstallBtn.textContent = 'Add Mod';
 
     if (res.success) {
       installPreviewModal.classList.remove('active');
@@ -1085,14 +1528,7 @@ onMounted(() => {
     }
   });
 
-  setInterval(() => {
-    if (currentSelectionId && document.hasFocus()) {
-      const selected = folders.find(f => f.id === currentSelectionId);
-      if (selected && selected.hasGeode && !selected.isGDPS) {
-        window.backend.getMods(selected.path).then(renderMods);
-      }
-    }
-  }, 10000);
+  // Removed redundant setInterval for mods polling to reduce flickering
 
   deleteBtn.addEventListener('click', async () => {
     if (!currentSelectionId) return;
@@ -1174,7 +1610,7 @@ onMounted(() => {
 
     setTimeout(() => {
       playBtn.style.opacity = '1';
-      playBtn.innerHTML = `<span>${currentDict.play_now || 'PLAY'}</span>
+      playBtn.innerHTML = `<span>${currentDict.play_now || 'Play Now'}</span>
         <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
           <path d="M8 5v14l11-7z"/>
         </svg>`;
@@ -1185,17 +1621,17 @@ onMounted(() => {
     } else {
       if (currentSettings.closeOnLaunch) {
         setTimeout(() => {
-          window.backend.close();
+          window.backend.closeApp();
         }, 3000);
       }
     }
   });
 
   document.getElementById('min-btn').addEventListener('click', () => {
-    window.backend.minimize();
+    window.backend.minimizeApp();
   });
   document.getElementById('close-btn').addEventListener('click', () => {
-    window.backend.close();
+    window.backend.closeApp();
   });
 
   document.addEventListener('click', (e) => {
@@ -1442,6 +1878,19 @@ onMounted(() => {
 </script>
 
 <template>
+  <div v-if="store.isInitializing" class="loading-overlay">
+    <div class="loading-card">
+      <div class="loading-logo-container">
+        <img src="/appicon.png" class="loading-logo" />
+        <div class="loading-ring"></div>
+      </div>
+      <h2 id="loading-text">GD Organizer</h2>
+      <div class="loading-progress-container">
+        <div id="loading-bar" class="loading-bar"></div>
+      </div>
+      <p id="loading-status">Starting engine...</p>
+    </div>
+  </div>
 
   <!-- Custom Confirm Modal -->
   <div id="confirm-modal" class="modal-overlay">
@@ -1520,6 +1969,10 @@ onMounted(() => {
                     <div class="theme-card" id="theme-dark-btn" data-theme="dark">Dark</div>
                     <div class="theme-card" id="theme-light-btn" data-theme="light">Light</div>
                     <div class="theme-card" id="theme-system-btn" data-theme="system">System</div>
+                    <div class="theme-card" id="theme-geometry-dash-btn" data-theme="geometry-dash" style="background: #2a2233; color: #ffff00; font-weight: 900; border: 2px solid #ffff00; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Geode</div>
+                    <div class="theme-card" id="theme-custom-btn" data-theme="custom" style="background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.15), rgba(var(--accent-rgb), 0.05)); border: 1px solid var(--accent); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; font-weight: 600; letter-spacing: 0.5px; transition: all 0.3s ease;">
+                        <span>Custom</span>
+                    </div>
                   </div>
 
                   <label id="label-live-theme" style="margin-top: 20px; display: block;">Live Themes</label>
@@ -1551,6 +2004,13 @@ onMounted(() => {
                       id="accent-gray-btn" style="background: #808080; display: none;"></div>
                     <div class="accent-color-btn" data-color="#ed4245" data-rgb="237, 66, 69"
                       style="background: #ed4245;"></div>
+                    
+                    <div id="custom-accent-wrapper" class="accent-color-btn" style="position: relative; border: none; background: transparent; padding: 0; overflow: visible;">
+                      <input type="color" id="custom-accent-picker" style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 2;">
+                      <div id="custom-accent-preview" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.1); background: transparent; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="opacity: 0.8; color: white;"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1596,7 +2056,7 @@ onMounted(() => {
             <div class="settings-tab-content" id="tab-about" style="display: none;">
               <div class="about-section">
                 <h3 id="about-title">GD Organizer</h3>
-                <p id="about-version">Client Version : v1.1.0</p>
+                <p id="about-version">Client Version : v1.3.0</p>
                 <div class="about-description"
                   style="margin-top: 12px; font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
                   <p>GD Organizer is a lightweight launcher and mod manager for Geometry Dash. It helps you easily
@@ -1671,6 +2131,16 @@ onMounted(() => {
                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </button>
+              <button id="view-logs-btn" class="icon-btn" title="View Geode Logs" style="width: auto; padding: 0 16px; gap: 8px;">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                <span style="font-size: 13px; font-weight: 600;">Logs</span>
+              </button>
             </div>
           </div>
 
@@ -1680,10 +2150,18 @@ onMounted(() => {
               <div>
                 <h3 id="mods-header-title" style="margin: 0; font-size: 18px; color: white;">Installed Mods</h3>
                 <p id="mod-stats"
-                  style="margin: 4px 0 0 0; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px;">
-                  <span id="mod-count" style="color: var(--accent); font-weight: bold;">0</span> <span
-                    id="mods-found-text">MODS FOUND</span>
+                  style="margin: 6px 0 0 0; font-size: 12px; color: var(--text-dim);">
+                  <span id="mod-count" style="color: var(--text-secondary); font-weight: 500;">0</span>
+                  <span id="mods-found-text">mods found</span>
                 </p>
+                <div style="margin-top: 8px; display: flex; gap: 8px;">
+                  <button id="update-all-btn" class="btn-primary" style="display: none; padding: 4px 12px; font-size: 11px; height: 24px;">Update All</button>
+                  <select id="sort-mods-select" class="settings-select" style="padding: 0 8px; font-size: 11px; height: 24px; width: auto; background: rgba(0,0,0,0.2); border-color: var(--border);">
+                    <option value="name">Sort by Name</option>
+                    <option value="enabled">Sort by Enabled</option>
+                    <option value="version">Sort by Version</option>
+                  </select>
+                </div>
               </div>
               <div style="display: flex; gap: 8px;">
                 <div class="search-box">
@@ -1693,6 +2171,7 @@ onMounted(() => {
                   </svg>
                   <input type="text" id="mod-search" placeholder="Search mods..." autocomplete="off">
                 </div>
+                <button id="toggle-view-btn" class="install-mod-btn" title="Toggle Grid/List View" style="padding: 0; width: 32px; display: flex; align-items: center; justify-content: center;"></button>
                 <button id="install-mod-btn" class="install-mod-btn">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                     <path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6z" />
@@ -1839,6 +2318,21 @@ onMounted(() => {
   </div>
 
 
+  <div id="log-modal" class="modal-overlay">
+    <div class="modal" style="width: 800px; max-height: 85vh; display: flex; flex-direction: column;">
+      <div class="modal-header" style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 15px;">
+        <h3 id="log-modal-title" style="margin: 0;">Geode Logs (latest.log)</h3>
+        <div style="display: flex; gap: 8px;">
+          <button id="refresh-logs-btn" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;">Refresh</button>
+          <button id="close-logs-btn" class="btn-secondary" style="border: none; padding: 6px 12px;">✕</button>
+        </div>
+      </div>
+      <div class="modal-body" style="flex: 1; overflow-y: auto; background: #111; color: #ccc; padding: 15px; border-radius: 8px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; white-space: pre-wrap; line-height: 1.4; border: 1px solid #333;">
+        <code id="log-content">Loading logs...</code>
+      </div>
+    </div>
+  </div>
+
   <div id="preset-modal" class="modal-overlay">
     <div class="modal" style="width: 320px;">
       <div class="modal-header">
@@ -1857,6 +2351,62 @@ onMounted(() => {
   </div>
 
   
+  <div id="theme-editor-modal" class="modal-overlay">
+    <div class="modal" style="width: 520px; display: flex; gap: 25px; padding: 25px;">
+      <div style="flex: 1;">
+        <div class="modal-header">
+          <h3 id="theme-editor-title" style="margin: 0; color: var(--accent); display: flex; align-items: center; gap: 8px;">
+            <span>Custom Palette</span>
+          </h3>
+          <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Personalize your environment colors</p>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="font-size: 13px;">App Background</label>
+            <input type="color" id="edit-bg-app" style="background:none; border:none; width:40px; height:24px; cursor:pointer;">
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="font-size: 13px;">Sidebar Background</label>
+            <input type="color" id="edit-bg-sidebar" style="background:none; border:none; width:40px; height:24px; cursor:pointer;">
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="font-size: 13px;">Primary Text</label>
+            <input type="color" id="edit-text-primary" style="background:none; border:none; width:40px; height:24px; cursor:pointer;">
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="font-size: 13px;">Secondary Text</label>
+            <input type="color" id="edit-text-secondary" style="background:none; border:none; width:40px; height:24px; cursor:pointer;">
+          </div>
+        </div>
+        
+        <div class="modal-footer" style="margin-top: 25px;">
+          <button id="close-theme-editor" class="btn-secondary" style="border: none;">Cancel</button>
+          <button id="save-custom-theme" class="btn-primary" style="padding: 10px 24px; background: var(--accent);">Save Colors</button>
+        </div>
+      </div>
+
+      <!-- Mini Preview UI -->
+      <div style="width: 160px; display: flex; flex-direction: column; gap: 10px;">
+        <label style="font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px;">Preview</label>
+        <div id="mini-mockup" style="flex: 1; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); display: flex; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+          <div id="mini-sidebar" style="width: 40px; background: #111214; border-right: 1px solid rgba(255,255,255,0.05); padding: 8px 4px; display: flex; flex-direction: column; gap: 6px;">
+            <div style="width: 100%; height: 6px; border-radius: 2px; background: rgba(255,255,255,0.1);"></div>
+            <div style="width: 80%; height: 6px; border-radius: 2px; background: var(--accent); opacity: 0.8;"></div>
+            <div style="width: 90%; height: 6px; border-radius: 2px; background: rgba(255,255,255,0.05);"></div>
+          </div>
+          <div id="mini-content" style="flex: 1; background: #1e1f22; padding: 12px 10px; display: flex; flex-direction: column; gap: 10px;">
+            <div id="mini-text-p" style="width: 60%; height: 8px; border-radius: 2px; background: #dbdee1;"></div>
+            <div id="mini-text-s" style="width: 40%; height: 5px; border-radius: 2px; background: #949ba4; opacity: 0.5;"></div>
+            <div id="mini-btn-accent" style="margin-top: auto; width: 100%; height: 20px; border-radius: 4px; background: var(--accent); display: flex; align-items: center; justify-content: center;">
+               <div style="width: 40%; height: 4px; background: white; border-radius: 2px; opacity: 0.8;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="credits-modal">
     <div class="modal-content" style="max-width: 450px;">
       <h2 id="credits-modal-title"></h2>

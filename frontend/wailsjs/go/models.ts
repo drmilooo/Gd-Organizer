@@ -61,6 +61,7 @@ export namespace main {
 	    description: string;
 	    file: string;
 	    dependencies: string[];
+	    icon: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModInfo(source);
@@ -75,6 +76,7 @@ export namespace main {
 	        this.description = source["description"];
 	        this.file = source["file"];
 	        this.dependencies = source["dependencies"];
+	        this.icon = source["icon"];
 	    }
 	}
 

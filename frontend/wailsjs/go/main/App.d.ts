@@ -7,7 +7,9 @@ export function AnalyzeGame(arg1:string):Promise<main.GameAnalysis>;
 
 export function BrowseCatalog(arg1:number,arg2:string,arg3:string):Promise<Record<string, any>>;
 
-export function CloseWindow():Promise<void>;
+export function BulkToggleMods(arg1:string,arg2:Array<Record<string, any>>):Promise<Record<string, any>>;
+
+export function CloseApp():Promise<void>;
 
 export function DeleteMod(arg1:string,arg2:string):Promise<Record<string, any>>;
 
@@ -25,12 +27,16 @@ export function LaunchGame(arg1:string,arg2:string):Promise<main.LaunchResult>;
 
 export function LoadData(arg1:string):Promise<string>;
 
-export function MinimizeWindow():Promise<void>;
+export function MinimizeApp():Promise<void>;
 
 export function OpenFile(arg1:Array<frontend.FileFilter>):Promise<string>;
 
 export function OpenFolder():Promise<string>;
 
+export function ReadLogs(arg1:string):Promise<string>;
+
 export function SaveData(arg1:string,arg2:string):Promise<void>;
 
 export function ToggleMod(arg1:string,arg2:string,arg3:boolean,arg4:string):Promise<Record<string, any>>;
+
+export function UpdateMod(arg1:string,arg2:string,arg3:string):Promise<Record<string, any>>;
